@@ -40,6 +40,7 @@
 #include <termios.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -159,14 +160,15 @@ void editorSetStatusMessage(const char *fmt, ...);
  * There is no support to highlight patterns currently. */
 
 /* C / C++ */
-char *C_HL_extensions[] = {".c",".cpp",NULL};
+char *C_HL_extensions[] = {".c",".cpp",".h",NULL};
 char *C_HL_keywords[] = {
         /* A few C / C++ keywords */
         "switch","if","while","for","break","continue","return","else",
-        "struct","union","typedef","static","enum","class",
+        "struct","union","typedef","static","enum","class","volatile",
+	"extern","auto","const","do","default",
         /* C types */
         "int|","long|","double|","float|","char|","unsigned|","signed|",
-        "void|",NULL
+        "void|","short|",NULL
 };
 
 /* Here we define an array of syntax highlights by extensions, keywords,
