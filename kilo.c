@@ -49,6 +49,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 /* Syntax highlight types */
