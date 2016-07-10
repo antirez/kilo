@@ -108,7 +108,7 @@ struct editorConfig {
 
 static struct editorConfig E;
 
-enum KEY_ACTION{
+enum KEY_ACTION {
         KEY_NULL = 0,       /* NULL */
         CTRL_C = 3,         /* Ctrl-c */
         CTRL_D = 4,         /* Ctrl-d */
@@ -149,7 +149,7 @@ void editorSetStatusMessage(const char *fmt, ...);
  * a trailing '|' character is added at the end, they are highlighted in
  * a different color, so that you can have two different sets of keywords.
  *
- * Finally add a stanza in the HLDB global variable with two two arrays
+ * Finally add a stanza in the HLDB global variable with two arrays
  * of strings, and a set of flags in order to enable highlighting of
  * comments and numbers.
  *
@@ -594,7 +594,7 @@ void editorFreeRow(erow *row) {
     free(row->hl);
 }
 
-/* Remove the row at the specified position, shifting the remainign on the
+/* Remove the row at the specified position, shifting the remaining on the
  * top. */
 void editorDelRow(int at) {
     erow *row;
@@ -610,7 +610,7 @@ void editorDelRow(int at) {
 
 /* Turn the editor rows into a single heap-allocated string.
  * Returns the pointer to the heap-allocated string and populate the
- * integer pointed by 'buflen' with the size of the string, escluding
+ * integer pointed by 'buflen' with the size of the string, excluding
  * the final nulterm. */
 char *editorRowsToString(int *buflen) {
     char *buf = NULL, *p;
@@ -1216,7 +1216,7 @@ void editorProcessKeypress(int fd) {
         editorMoveCursor(c);
         break;
     case CTRL_L: /* ctrl+l, clear screen */
-        /* Just refresht the line as side effect. */
+        /* Just refresh the line as side effect. */
         break;
     case ESC:
         /* Nothing to do for ESC in this mode. */
