@@ -34,7 +34,9 @@
 
 #define KILO_VERSION "0.0.1"
 
+#ifdef __GLIBC__
 #define _POSIX_C_SOURCE 200809L
+#endif
 
 #include <termios.h>
 #include <stdlib.h>
@@ -49,6 +51,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <signal.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -1244,6 +1247,22 @@ int editorFileWasModified(void) {
     return E.dirty;
 }
 
+void updateWindowSize(void) {
+    if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
+                      &E.screenrows,&E.screencols) == -1) {
+        perror("Unable to query the screen for size (columns / rows)");
+        exit(1);
+    }
+    E.screenrows -= 2; /* Get room for status bar. */
+}
+
+void handleSigWinCh(int unused __attribute__((unused))) {
+    updateWindowSize();
+    if (E.cy > E.screenrows) E.cy = E.screenrows - 1;
+    if (E.cx > E.screencols) E.cx = E.screencols - 1;
+    editorRefreshScreen();
+}
+
 void initEditor(void) {
     E.cx = 0;
     E.cy = 0;
@@ -1254,13 +1273,8 @@ void initEditor(void) {
     E.dirty = 0;
     E.filename = NULL;
     E.syntax = NULL;
-    if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
-                      &E.screenrows,&E.screencols) == -1)
-    {
-        perror("Unable to query the screen for size (columns / rows)");
-        exit(1);
-    }
-    E.screenrows -= 2; /* Get room for status bar. */
+    updateWindowSize();
+    signal(SIGWINCH, handleSigWinCh);
 }
 
 int main(int argc, char **argv) {
