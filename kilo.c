@@ -50,6 +50,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <time.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
