@@ -35,6 +35,7 @@
 #define KILO_VERSION "0.0.1"
 
 #define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #define _GNU_SOURCE
 
 #include <termios.h>
@@ -160,15 +161,25 @@ void editorSetStatusMessage(const char *fmt, ...);
  * There is no support to highlight patterns currently. */
 
 /* C / C++ */
-char *C_HL_extensions[] = {".c",".cpp",".h",NULL};
+char *C_HL_extensions[] = {".c",".h",".cpp",".hpp",".cc",NULL};
 char *C_HL_keywords[] = {
-        /* A few C / C++ keywords */
-        "switch","if","while","for","break","continue","return","else",
-        "struct","union","typedef","static","enum","class","volatile",
-	"extern","auto","const","do","default",
-        /* C types */
+	/* C Keywords */
+	"auto","break","case","continue","default","do","else","enum",
+	"extern","for","goto","if","register","return","sizeof","static",
+	"struct","switch","typedef","union","volatile","while",
+
+	/* C++ Keywords */
+	"alignas","alignof","and","and_eq","asm","bitand","bitor","class",
+	"compl","constexpr","const_cast","deltype","delete","dynamic_cast",
+	"explicit","export","false","friend","inline","mutable","namespace",
+	"new","noexcept","not","not_eq","nullptr","operator","or","or_eq",
+	"private","protected","public","reinterpret_cast","static_assert",
+	"static_cast","template","this","thread_local","throw","true","try",
+	"typeid","typename","virtual","xor","xor_eq",
+        
+	/* C types */
         "int|","long|","double|","float|","char|","unsigned|","signed|",
-        "void|","short|",NULL
+        "void|","short|","auto|","const|","bool|",NULL
 };
 
 /* Here we define an array of syntax highlights by extensions, keywords,
