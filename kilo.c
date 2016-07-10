@@ -143,7 +143,7 @@ void editorSetStatusMessage(const char *fmt, ...);
  * matches and keywords. The file name matches are used in order to match
  * a given syntax with a given file name: if a match pattern starts with a
  * dot, it is matched as the last past of the filename, for example ".c".
- * Otherwise the pattern is just searched inside the filenme, like "Makefile").
+ * Otherwise the pattern is just searched inside the filename, like "Makefile").
  *
  * The list of keywords to highlight is just a list of words, however if they
  * a trailing '|' character is added at the end, they are highlighted in
