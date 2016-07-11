@@ -1181,8 +1181,16 @@ void editorProcessKeypress(int fd) {
                 "Press Ctrl-Q %d more times to quit.", quit_times);
             quit_times--;
             return;
+        } else {
+                /* move cursor below editor before quitting */
+                char buf[32];
+                struct abuf ab = ABUF_INIT;
+                snprintf(buf,sizeof(buf),"\x1b[%d;%dH\r\n",E.screenrows+2,1); //numrows
+                abAppend(&ab,buf,strlen(buf));
+                write(STDOUT_FILENO,ab.b,ab.len);
+                abFree(&ab);
+                exit(0);
         }
-        exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
         editorSave();
