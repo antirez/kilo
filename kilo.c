@@ -42,7 +42,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
@@ -1182,6 +1181,7 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        system("clear");
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
