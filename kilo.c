@@ -350,7 +350,7 @@ failed:
 /* ====================== Syntax highlight color scheme  ==================== */
 
 int is_separator(int c) {
-    return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];",c) != NULL;
+    return c == '\0' || isspace(c) || strchr("{},.()+-/*=~%[];<>|&",c) != NULL;
 }
 
 /* Return true if the specified row last char is part of a multi line comment
@@ -462,6 +462,10 @@ void editorUpdateSyntax(erow *row) {
             p++; i++;
             prev_sep = 0;
             continue;
+        }
+
+        if (is_separator(*p)) {
+            row->hl[i] = HL_KEYWORD1;
         }
 
         /* Handle keywords and lib calls */
