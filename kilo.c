@@ -49,6 +49,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <time.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -1194,9 +1195,10 @@ void editorProcessKeypress(int fd) {
                 "Press Ctrl-Q %d more times to quit.", quit_times);
             quit_times--;
             return;
+        } else {
+           system("clear");
+           exit(0);
         }
-        system("clear");
-        exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
         editorSave();
