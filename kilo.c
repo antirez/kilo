@@ -986,6 +986,20 @@ void editorSetStatusMessage(const char *fmt, ...) {
 
 #define KILO_QUERY_LEN 256
 
+void startOfLine() {
+     int filerow = E.rowoff + E.cy;
+     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+     if (row )
+         E.cx = 0;
+ }
+
+void endOfLine() {
+  int filerow = E.rowoff + E.cy;
+  erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+  if (row)
+    E.cx = row->size;
+}
+
 void editorFind(int fd) {
     char query[KILO_QUERY_LEN+1] = {0};
     int qlen = 0;
@@ -1208,7 +1222,12 @@ void editorProcessKeypress(int fd) {
                                             ARROW_DOWN);
         }
         break;
-
+    case HOME_KEY:
+        startOfLine();
+        break;
+    case END_KEY:
+        endOfLine();
+        break;
     case ARROW_UP:
     case ARROW_DOWN:
     case ARROW_LEFT:
