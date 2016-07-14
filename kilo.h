@@ -108,8 +108,6 @@ struct editorConfig {
     struct editorSyntax *syntax;    /* Current syntax highlight, or NULL. */
 };
 
-static struct editorConfig E;
-
 enum KEY_ACTION{
         KEY_NULL = 0,       /* NULL */
         CTRL_C = 3,         /* Ctrl-c */
@@ -167,8 +165,6 @@ extern char *C_HL_keywords[];
 /* Here we define an array of syntax highlights by extensions, keywords,
  * comments delimiters and flags. */
 extern struct editorSyntax HLDB[];
-
-static struct termios orig_termios; /* In order to restore at exit.*/
 
 void disableRawMode(int fd);
 void editorAtExit(void);
