@@ -10,4 +10,4 @@ main.o: main.c
 	$(CC) -c $(CFLAGS) main.c
 
 clean:
-	rm *.o kilo
+	rm -f *.o kilo
