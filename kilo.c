@@ -198,6 +198,7 @@ void disableRawMode(int fd) {
 /* Called at exit to avoid remaining in raw mode. */
 void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
+    printf("\033[2J\033[1;1H");
 }
 
 /* Raw mode: 1960 magic shit. */
@@ -1182,7 +1183,6 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
-        printf("\033[2J\033[1;1H");
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
