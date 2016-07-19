@@ -120,6 +120,7 @@ enum KEY_ACTION{
         CTRL_Q = 17,        /* Ctrl-q */
         CTRL_S = 19,        /* Ctrl-s */
         CTRL_U = 21,        /* Ctrl-u */
+        CTRL_Z = 26,		/* Ctrl-z i*/
         ESC = 27,           /* Escape */
         BACKSPACE =  127,   /* Backspace */
         /* The following are just soft codes, not really reported by the
@@ -1182,6 +1183,9 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        exit(0);
+        break;
+    case CTRL_Z:		/* Ctrl-z */
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
