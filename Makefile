@@ -1,3 +1,4 @@
+CC := gcc
 all: kilo
 
 kilo: kilo.c
