@@ -3,7 +3,7 @@ Kilo
 
 Kilo is a small text editor in less than 1K lines of code (counted with cloc).
 
-A screencast is available here: https://asciinema.org/a/90r2i9bq8po03nazhqtsifksb
+A screencast is available here: [https://asciinema.org/a/90r2i9bq8po03nazhqtsifksb][1]
 
 Usage: kilo `<filename>`
 
@@ -24,3 +24,5 @@ style CLI.
 
 Kilo was written by Salvatore Sanfilippo aka antirez and is released
 under the BSD 2 clause license.
+
+[1]: https://asciinema.org/a/90r2i9bq8po03nazhqtsifksb
