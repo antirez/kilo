@@ -46,9 +46,12 @@ void editorProcessKeypress(int fd) {
     case '/':
       editorFind(fd);
       break;
-    case ':':
-      editorHandleFunctionCall(fd);
+    case ':': {
+      char *fn = editorReadStringFromStatusBar(":");
+      if (fn)
+        editorHandleFunctionCall(fn);
       break;
+    }
     case BACKSPACE: /* Backspace */
     case DEL_KEY:
       editorDelChar();
