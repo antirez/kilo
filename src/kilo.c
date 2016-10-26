@@ -761,11 +761,11 @@ char *editorReadStringFromStatusBar(char *prefix) {
   }
 
 fail:
-  editorSetStatusMessage("");
   free(str);
   str = NULL;
 
 done:
+  editorSetStatusMessage("");
   E.cy = restoreCY;
   E.cx = restoreCX;
   editorRefreshScreen();
