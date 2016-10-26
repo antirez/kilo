@@ -28,17 +28,7 @@ void editorProcessKeypress(int fd) {
        * to the edited file. */
       break;
     case CTRL_Q: /* Ctrl-q */
-      if (E.dirty) {
-        editorSetStatusMessage("WARNING!!! File has unsaved changes."
-                               "Do you want to continue? (y/n)");
-        editorRefreshScreen();
-        c = editorReadKey(fd);
-        if (!(c == 'y' || c == 'Y')) {
-          editorSetStatusMessage("");
-          return;
-        }
-      }
-      exit(0);
+      quit(); // TODO fd vs STDIN_FILENO
       break;
     case CTRL_S: /* Ctrl-s */
       editorSave();
