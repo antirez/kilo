@@ -53,7 +53,6 @@
 
 #include "kilo.h"
 #include "process_keypress.h"
-#include "function.h"
 #include "init.h"
 
 struct editorConfig E;
