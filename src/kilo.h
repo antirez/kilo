@@ -93,6 +93,7 @@ void editorRefreshScreen(void);
 
 int editorReadKey(int fd);
 int getCursorPosition(int ifd, int ofd, int *rows, int *cols);
+void editorMoveCursor(int key);
 int getWindowSize(int ifd, int ofd, int *rows, int *cols);
 
 /* ======================= Editor rows implementation ======================= */
