@@ -318,6 +318,40 @@ void editorDelRow(int at) {
     E.dirty++;
 }
 
+void editorDeleteLines(int brow, int erow) {
+  if (brow > erow)
+    SWAP(brow, erow);
+
+  int iter = erow - brow;
+  int uppos = E.cy + E.rowoff - iter;
+  if (uppos < 0)
+    uppos = 0;
+
+  while (iter--)
+    editorDelRow(brow);
+
+  E.cy = uppos;
+}
+
+void editorDeleteSelection(int brow, int bpos, int erow, int epos) {
+  if (bpos > epos)
+    SWAP(bpos, epos);
+
+  /* Join the begin of brow and the end of erow together */
+  if (bpos > E.row[brow].size || epos > E.row[erow].size)
+    return;
+  char *begin = strndup(E.row[brow].chars, bpos);
+  char *end = strdup(E.row[erow].chars + epos + 1);
+  int size = bpos + strlen(end);
+  begin = realloc(begin, size + 1);
+  strcat(begin, end);
+
+  editorDeleteLines(brow, erow + 1);
+  editorInsertRow(brow, begin, size);
+
+  E.cx = bpos;
+}
+
 /* Turn the editor rows into a single heap-allocated string.
  * Returns the pointer to the heap-allocated string and populate the
  * integer pointed by 'buflen' with the size of the string, escluding
@@ -888,11 +922,12 @@ void initEditor(void) {
     E.dirty = 0;
     E.filename = NULL;
     E.syntax = NULL;
-    if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
-                      &E.screenrows,&E.screencols) == -1)
-    {
-        perror("Unable to query the screen for size (columns / rows)");
-        exit(1);
+    E.selection_row = 0;
+    E.selection_offset = 0;
+    if (getWindowSize(STDIN_FILENO, STDOUT_FILENO, &E.screenrows,
+                      &E.screencols) == -1) {
+      perror("Unable to query the screen for size (columns / rows)");
+      exit(1);
     }
     E.screenrows -= 2; /* Get room for status bar. */
 }
