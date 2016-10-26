@@ -112,6 +112,10 @@ void editorProcessKeypress(int fd) {
     case ARROW_RIGHT:
       editorMoveCursor(c - ARROW_LEFT);
       break;
+    case BACKSPACE: /* Backspace */
+    case DEL_KEY:
+      editorDelChar();
+      break;
     case ENTER:
       editorInsertNewline();
       break;
