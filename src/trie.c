@@ -25,7 +25,7 @@ void trieAddKeyValue(struct trie *t, char *key, void *value) {
 
 void *trieLookup(struct trie *t, char *key) {
   struct trie *next;
-  if (*(key+1) == '\0') {
+  if (*key == '\0') {
     return t->value;
   } else if ((next = t->next[(int)*key])) {
     return trieLookup(next, key+1);

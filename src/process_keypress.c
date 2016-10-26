@@ -1,14 +1,9 @@
 #include "process_keypress.h"
 #include "function.h"
 #include "kilo.h"
+#include "colon.h"
 
 enum vimMode mode;
-
-// Dummy
-int editorHandleFunctionCall(int fd) {
-  (void)fd;
-  return 0;
-}
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
@@ -39,7 +34,7 @@ void editorProcessKeypress(int fd) {
     case ':': {
       char *fn = editorReadStringFromStatusBar(":");
       if (fn)
-        editorHandleFunctionCall(fn);
+        handleColonFunction(fn);
       break;
     }
     case BACKSPACE: /* Backspace */
