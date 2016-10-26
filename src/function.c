@@ -1,6 +1,8 @@
 #include "function.h"
+#include "kilo.h"
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
 
 /* =============================== Find mode ================================ */
 
@@ -98,4 +100,18 @@ void editorFind(int fd) {
             }
         }
     }
+}
+
+void quit() {
+  if (E.dirty) {
+    editorSetStatusMessage("WARNING!!! File has unsaved changes."
+                           "Do you want to continue? (y/n)");
+    editorRefreshScreen();
+    char c = editorReadKey(STDIN_FILENO);
+    if (!(c == 'y' || c == 'Y')) {
+      editorSetStatusMessage("");
+      return;
+    }
+  }
+  exit(0);
 }

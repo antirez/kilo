@@ -1,14 +1,9 @@
 #include "process_keypress.h"
 #include "function.h"
 #include "kilo.h"
+#include "colon.h"
 
 enum vimMode mode;
-
-// Dummy
-int editorHandleFunctionCall(int fd) {
-  (void)fd;
-  return 0;
-}
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
@@ -28,17 +23,7 @@ void editorProcessKeypress(int fd) {
        * to the edited file. */
       break;
     case CTRL_Q: /* Ctrl-q */
-      if (E.dirty) {
-        editorSetStatusMessage("WARNING!!! File has unsaved changes."
-                               "Do you want to continue? (y/n)");
-        editorRefreshScreen();
-        c = editorReadKey(fd);
-        if (!(c == 'y' || c == 'Y')) {
-          editorSetStatusMessage("");
-          return;
-        }
-      }
-      exit(0);
+      quit(); // TODO fd vs STDIN_FILENO
       break;
     case CTRL_S: /* Ctrl-s */
       editorSave();
@@ -49,7 +34,7 @@ void editorProcessKeypress(int fd) {
     case ':': {
       char *fn = editorReadStringFromStatusBar(":");
       if (fn)
-        editorHandleFunctionCall(fn);
+        handleColonFunction(fn);
       break;
     }
     case BACKSPACE: /* Backspace */
