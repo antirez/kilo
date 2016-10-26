@@ -691,6 +691,87 @@ void editorSetStatusMessage(const char *fmt, ...) {
     E.statusmsg_time = time(NULL);
 }
 
+char *editorReadStringFromStatusBar(char *prefix) {
+  int init_offset = strlen(prefix);
+  editorSetStatusMessage(prefix);
+
+  int restoreCX = E.cx, restoreCY = E.cy;
+
+  E.cx = init_offset;
+  E.cy = E.screencols - 1;
+
+  int inspos = 0;
+  int endpos = 0;
+
+  int bufsz = 32;
+  char *str = malloc(bufsz + init_offset);
+  char statmsg[80];
+  strcpy(statmsg, prefix);
+
+  for (;;) {
+    strcpy(statmsg + init_offset, str);
+    editorSetStatusMessage(statmsg);
+    editorRefreshScreen();
+    int c = editorReadKey(STDIN_FILENO);
+    switch (c) {
+    case ENTER:
+      str[endpos] = '\0';
+      goto done;
+    case DEL_KEY:
+    case BACKSPACE:
+      if (inspos) {
+        memmove(str + inspos - 1, str + inspos, endpos - inspos + 1);
+        inspos--;
+        endpos--;
+        E.cx--;
+      }
+      break;
+
+    case ARROW_RIGHT:
+      if (inspos < endpos) {
+        inspos++;
+        E.cx++;
+        editorRefreshScreen();
+      }
+      break;
+    case ARROW_LEFT:
+      if (inspos) {
+        inspos--;
+        E.cx--;
+        editorRefreshScreen();
+      }
+      break;
+    case CTRL_C: /* Everything else: just bail out. */
+    case CTRL_Q:
+    case CTRL_S:
+    case PAGE_UP:
+    case PAGE_DOWN:
+    case ARROW_UP:
+    case ARROW_DOWN:
+      goto fail;
+
+    default:
+      if (endpos == bufsz)
+        str = realloc(str, bufsz *= 2);
+      memmove(str + inspos + 1, str + inspos, endpos - inspos + 1);
+      str[inspos++] = c;
+      endpos++;
+      E.cx++;
+    }
+  }
+
+fail:
+  editorSetStatusMessage("");
+  free(str);
+  str = NULL;
+
+done:
+  E.cy = restoreCY;
+  E.cx = restoreCX;
+  editorRefreshScreen();
+  return str;
+}
+
 /* ========================= Editor events handling  ======================== */
 
 /* Handle cursor position change because arrow keys were pressed. */

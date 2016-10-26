@@ -116,6 +116,7 @@ void editorRowDelChar(erow *row, int at);
 void editorInsertChar(int c);
 void editorInsertNewline(void);
 void editorDelChar();
+char *editorReadStringFromStatusBar(char *prefix);
 
 int editorOpen(char *filename);
 

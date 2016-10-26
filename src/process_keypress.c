@@ -27,16 +27,19 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
-        exit(0);
-        break;
-    case CTRL_S:        /* Ctrl-s */
-        editorSave();
-        break;
-    case CTRL_F:
-        editorFind(fd);
-        break;
-    case BACKSPACE:     /* Backspace */
-    case CTRL_H:        /* Ctrl-h */
+      }
+      exit(0);
+      break;
+    case CTRL_S: /* Ctrl-s */
+      editorSave();
+      break;
+    case '/':
+      editorFind(fd);
+      break;
+    case ':':
+      editorReadStringFromStatusBar(":");
+      break;
+    case BACKSPACE: /* Backspace */
     case DEL_KEY:
         editorDelChar();
         break;
