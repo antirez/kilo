@@ -121,4 +121,6 @@ int editorOpen(char *filename);
 
 int editorSave();
 
+int editorHandleFunctionCall();
+
 #endif

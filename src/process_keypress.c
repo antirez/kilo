@@ -1,75 +1,125 @@
-#include "kilo.h"
 #include "process_keypress.h"
 #include "function.h"
+#include "kilo.h"
+
+enum vimMode mode;
+
+// Dummy
+int editorHandleFunctionCall(int fd) {
+  (void)fd;
+  return 0;
+}
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
-#define KILO_QUIT_TIMES 3
 void editorProcessKeypress(int fd) {
-    /* When the file is modified, requires Ctrl-q to be pressed N times
-     * before actually quitting. */
-    static int quit_times = KILO_QUIT_TIMES;
+  /* When the file is modified, requires Ctrl-q to be pressed N times
+   * before actually quitting. */
 
-    int c = editorReadKey(fd);
-    switch(c) {
-    case ENTER:         /* Enter */
-        editorInsertNewline();
-        break;
-    case CTRL_C:        /* Ctrl-c */
-        /* We ignore ctrl-c, it can't be so simple to lose the changes
-         * to the edited file. */
-        break;
-    case CTRL_Q:        /* Ctrl-q */
-        /* Quit if the file was already saved. */
-        if (E.dirty && quit_times) {
-            editorSetStatusMessage("WARNING!!! File has unsaved changes. "
-                "Press Ctrl-Q %d more times to quit.", quit_times);
-            quit_times--;
-            return;
+  int c = editorReadKey(fd);
+
+  if (mode == VM_NORMAL) {
+    switch (c) {
+    case ENTER: /* Enter */
+      editorMoveCursor(DOWN);
+      break;
+    case CTRL_C: /* Ctrl-c */
+      /* We ignore ctrl-c, it can't be so simple to lose the changes
+       * to the edited file. */
+      break;
+    case CTRL_Q: /* Ctrl-q */
+      if (E.dirty) {
+        editorSetStatusMessage("WARNING!!! File has unsaved changes."
+                               "Do you want to continue? (y/n)");
+        editorRefreshScreen();
+        c = editorReadKey(fd);
+        if (!(c == 'y' || c == 'Y')) {
+          editorSetStatusMessage("");
+          return;
         }
-        exit(0);
-        break;
-    case CTRL_S:        /* Ctrl-s */
-        editorSave();
-        break;
-    case CTRL_F:
-        editorFind(fd);
-        break;
-    case BACKSPACE:     /* Backspace */
-    case CTRL_H:        /* Ctrl-h */
+      }
+      exit(0);
+      break;
+    case CTRL_S: /* Ctrl-s */
+      editorSave();
+      break;
+    case '/':
+      editorFind(fd);
+      break;
+    case ':':
+      editorHandleFunctionCall(fd);
+      break;
+    case BACKSPACE: /* Backspace */
     case DEL_KEY:
-        editorDelChar();
-        break;
+      editorDelChar();
+      break;
     case PAGE_UP:
     case PAGE_DOWN:
-        if (c == PAGE_UP && E.cy != 0)
-            E.cy = 0;
-        else if (c == PAGE_DOWN && E.cy != E.screenrows-1)
-            E.cy = E.screenrows-1;
-        {
+      if (c == PAGE_UP && E.cy != 0)
+        E.cy = 0;
+      else if (c == PAGE_DOWN && E.cy != E.screenrows - 1)
+        E.cy = E.screenrows - 1;
+      {
         int times = E.screenrows;
-        while(times--)
-            editorMoveCursor(c == PAGE_UP ? UP:
-                                            DOWN);
-        }
-        break;
+        while (times--)
+          editorMoveCursor(c == PAGE_UP ? UP : DOWN);
+      }
+      break;
 
     case ARROW_UP:
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
-        editorMoveCursor(c - ARROW_LEFT);
-        break;
+      editorMoveCursor(c - ARROW_LEFT);
+      break;
+    case 'h':
+      editorMoveCursor(LEFT);
+      break;
+    case 'j':
+      editorMoveCursor(DOWN);
+      break;
+    case 'k':
+      editorMoveCursor(UP);
+      break;
+    case 'l':
+      editorMoveCursor(RIGHT);
+      break;
+    case 'i':
+      mode = VM_INSERT;
+      editorSetStatusMessage("INSERT");
+      break;
+    case 'x':
+      editorDelChar();
+      break;
     case CTRL_L: /* ctrl+l, clear screen */
-        /* Just refresht the line as side effect. */
-        break;
+      /* Just refresh the line as side effect. */
+      break;
     case ESC:
-        /* Nothing to do for ESC in this mode. */
-        break;
+      /* Nothing to do for ESC in this mode. */
+      break;
     default:
-        editorInsertChar(c);
-        break;
+      /* Unhandled input, ignore. */
+      break;
     }
-
-    quit_times = KILO_QUIT_TIMES; /* Reset it to the original value. */
+  } else if (mode == VM_INSERT) {
+    switch (c) {
+    case ARROW_UP: // noob
+    case ARROW_DOWN:
+    case ARROW_LEFT:
+    case ARROW_RIGHT:
+      editorMoveCursor(c - ARROW_LEFT);
+      break;
+    case ENTER:
+      editorInsertNewline();
+      break;
+    case ESC:
+      mode = VM_NORMAL;
+      editorSetStatusMessage("NORMAL");
+      break;
+    default:
+      editorInsertChar(c);
+    }
+  } else if (mode == VM_SELECTION) {
+    // FIXME
+  }
 }
