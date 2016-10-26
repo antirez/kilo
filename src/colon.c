@@ -1,19 +1,24 @@
 #include "colon.h"
-#include <stdio.h>
 
-void printHello() {
-  printf("Hello\n");
-}
+#include <stdio.h>
+#include "trie.h"
+
+static struct trie *colonFunctions;
 
 void (*lookupColonFunction(char *name))() {
-  return &printHello; // TODO implement key value store get
+  return trieLookup(colonFunctions, name);
 }
 
-void handleColonFunction(char *name) {
+int handleColonFunction(char *name) {
   void (*func)() = lookupColonFunction(name);
-  func();
+  if (func) {
+    func();
+    return 0;
+  } else {
+    return 1;
+  }
 }
 
 void registerColonFunction(char *name, void (*func)()) {
-  // TODO implement key value store set
+  trieAddKeyValue(colonFunctions, name, func);
 }
