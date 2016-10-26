@@ -51,89 +51,10 @@
 #include <stdarg.h>
 #include <fcntl.h>
 
-/* Syntax highlight types */
-#define HL_NORMAL 0
-#define HL_NONPRINT 1
-#define HL_COMMENT 2   /* Single line comment. */
-#define HL_MLCOMMENT 3 /* Multi-line comment. */
-#define HL_KEYWORD1 4
-#define HL_KEYWORD2 5
-#define HL_STRING 6
-#define HL_NUMBER 7
-#define HL_MATCH 8      /* Search match. */
+#include "kilo.h"
+#include "function.h"
 
-#define HL_HIGHLIGHT_STRINGS (1<<0)
-#define HL_HIGHLIGHT_NUMBERS (1<<1)
-
-struct editorSyntax {
-    char **filematch;
-    char **keywords;
-    char singleline_comment_start[2];
-    char multiline_comment_start[3];
-    char multiline_comment_end[3];
-    int flags;
-};
-
-/* This structure represents a single line of the file we are editing. */
-typedef struct erow {
-    int idx;            /* Row index in the file, zero-based. */
-    int size;           /* Size of the row, excluding the null term. */
-    int rsize;          /* Size of the rendered row. */
-    char *chars;        /* Row content. */
-    char *render;       /* Row content "rendered" for screen (for TABs). */
-    unsigned char *hl;  /* Syntax highlight type for each character in render.*/
-    int hl_oc;          /* Row had open comment at end in last syntax highlight
-                           check. */
-} erow;
-
-typedef struct hlcolor {
-    int r,g,b;
-} hlcolor;
-
-struct editorConfig {
-    int cx,cy;  /* Cursor x and y position in characters */
-    int rowoff;     /* Offset of row displayed. */
-    int coloff;     /* Offset of column displayed. */
-    int screenrows; /* Number of rows that we can show */
-    int screencols; /* Number of cols that we can show */
-    int numrows;    /* Number of rows */
-    int rawmode;    /* Is terminal raw mode enabled? */
-    erow *row;      /* Rows */
-    int dirty;      /* File modified but not saved. */
-    char *filename; /* Currently open filename */
-    char statusmsg[80];
-    time_t statusmsg_time;
-    struct editorSyntax *syntax;    /* Current syntax highlight, or NULL. */
-};
-
-static struct editorConfig E;
-
-enum KEY_ACTION{
-        KEY_NULL = 0,       /* NULL */
-        CTRL_C = 3,         /* Ctrl-c */
-        CTRL_D = 4,         /* Ctrl-d */
-        CTRL_F = 6,         /* Ctrl-f */
-        CTRL_H = 8,         /* Ctrl-h */
-        TAB = 9,            /* Tab */
-        CTRL_L = 12,        /* Ctrl+l */
-        ENTER = 13,         /* Enter */
-        CTRL_Q = 17,        /* Ctrl-q */
-        CTRL_S = 19,        /* Ctrl-s */
-        CTRL_U = 21,        /* Ctrl-u */
-        ESC = 27,           /* Escape */
-        BACKSPACE =  127,   /* Backspace */
-        /* The following are just soft codes, not really reported by the
-         * terminal directly. */
-        ARROW_LEFT = 1000,
-        ARROW_RIGHT,
-        ARROW_UP,
-        ARROW_DOWN,
-        DEL_KEY,
-        HOME_KEY,
-        END_KEY,
-        PAGE_UP,
-        PAGE_DOWN
-};
+struct editorConfig E;
 
 void editorSetStatusMessage(const char *fmt, ...);
 
@@ -803,7 +724,7 @@ int editorOpen(char *filename) {
 }
 
 /* Save the current file on disk. Return 0 on success, 1 on error. */
-int editorSave(void) {
+int editorSave() {
     int len;
     char *buf = editorRowsToString(&len);
     int fd = open(E.filename,O_RDWR|O_CREAT,0644);
@@ -981,104 +902,6 @@ void editorSetStatusMessage(const char *fmt, ...) {
     vsnprintf(E.statusmsg,sizeof(E.statusmsg),fmt,ap);
     va_end(ap);
     E.statusmsg_time = time(NULL);
-}
-
-/* =============================== Find mode ================================ */
-
-#define KILO_QUERY_LEN 256
-
-void editorFind(int fd) {
-    char query[KILO_QUERY_LEN+1] = {0};
-    int qlen = 0;
-    int last_match = -1; /* Last line where a match was found. -1 for none. */
-    int find_next = 0; /* if 1 search next, if -1 search prev. */
-    int saved_hl_line = -1;  /* No saved HL */
-    char *saved_hl = NULL;
-
-#define FIND_RESTORE_HL do { \
-    if (saved_hl) { \
-        memcpy(E.row[saved_hl_line].hl,saved_hl, E.row[saved_hl_line].rsize); \
-        saved_hl = NULL; \
-    } \
-} while (0)
-
-    /* Save the cursor position in order to restore it later. */
-    int saved_cx = E.cx, saved_cy = E.cy;
-    int saved_coloff = E.coloff, saved_rowoff = E.rowoff;
-
-    while(1) {
-        editorSetStatusMessage(
-            "Search: %s (Use ESC/Arrows/Enter)", query);
-        editorRefreshScreen();
-
-        int c = editorReadKey(fd);
-        if (c == DEL_KEY || c == CTRL_H || c == BACKSPACE) {
-            if (qlen != 0) query[--qlen] = '\0';
-            last_match = -1;
-        } else if (c == ESC || c == ENTER) {
-            if (c == ESC) {
-                E.cx = saved_cx; E.cy = saved_cy;
-                E.coloff = saved_coloff; E.rowoff = saved_rowoff;
-            }
-            FIND_RESTORE_HL;
-            editorSetStatusMessage("");
-            return;
-        } else if (c == ARROW_RIGHT || c == ARROW_DOWN) {
-            find_next = 1;
-        } else if (c == ARROW_LEFT || c == ARROW_UP) {
-            find_next = -1;
-        } else if (isprint(c)) {
-            if (qlen < KILO_QUERY_LEN) {
-                query[qlen++] = c;
-                query[qlen] = '\0';
-                last_match = -1;
-            }
-        }
-
-        /* Search occurrence. */
-        if (last_match == -1) find_next = 1;
-        if (find_next) {
-            char *match = NULL;
-            int match_offset = 0;
-            int i, current = last_match;
-
-            for (i = 0; i < E.numrows; i++) {
-                current += find_next;
-                if (current == -1) current = E.numrows-1;
-                else if (current == E.numrows) current = 0;
-                match = strstr(E.row[current].render,query);
-                if (match) {
-                    match_offset = match-E.row[current].render;
-                    break;
-                }
-            }
-            find_next = 0;
-
-            /* Highlight */
-            FIND_RESTORE_HL;
-
-            if (match) {
-                erow *row = &E.row[current];
-                last_match = current;
-                if (row->hl) {
-                    saved_hl_line = current;
-                    saved_hl = malloc(row->rsize);
-                    memcpy(saved_hl,row->hl,row->rsize);
-                    memset(row->hl+match_offset,HL_MATCH,qlen);
-                }
-                E.cy = 0;
-                E.cx = match_offset;
-                E.rowoff = current;
-                E.coloff = 0;
-                /* Scroll horizontally as needed. */
-                if (E.cx > E.screencols) {
-                    int diff = E.cx - E.screencols;
-                    E.cx -= diff;
-                    E.coloff += diff;
-                }
-            }
-        }
-    }
 }
 
 /* ========================= Editor events handling  ======================== */

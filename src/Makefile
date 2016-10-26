@@ -1,7 +1,12 @@
 all: kilo
 
-kilo: kilo.c
-	$(CC) -o kilo kilo.c -Wall -W -pedantic -std=c99
+SRC=kilo.c function.c
+INCLUDE=function.h kilo.h
+CFLAGS=-Wextra -pedantic -std=c11
+OBJS=kilo.o function.o
+
+kilo: $(OBJS)
+	$(CC) -o kilo $(OBJS)
 
 clean:
-	rm kilo
+	rm kilo $(OBJS)
