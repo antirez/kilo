@@ -1,7 +1,5 @@
-all: kilo
-
-kilo: kilo.c
-	$(CC) -o kilo kilo.c -Wall -W -pedantic -std=c99
+all:
+	$(MAKE) -C src
 
 clean:
-	rm kilo
+	$(MAKE) -C src clean
