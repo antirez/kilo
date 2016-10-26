@@ -45,6 +45,13 @@ struct editorConfig {
   struct editorSyntax *syntax; /* Current syntax highlight, or NULL. */
 };
 
+enum DIRECTION {
+  UP = 0,
+  DOWN = 1,
+  LEFT = 2,
+  RIGHT = 3
+};
+
 enum KEY_ACTION {
   KEY_NULL = 0,    /* NULL */
   CTRL_C = 3,      /* Ctrl-c */
@@ -93,7 +100,7 @@ void editorRefreshScreen(void);
 
 int editorReadKey(int fd);
 int getCursorPosition(int ifd, int ofd, int *rows, int *cols);
-void editorMoveCursor(int key);
+void editorMoveCursor(enum DIRECTION dir);
 int getWindowSize(int ifd, int ofd, int *rows, int *cols);
 
 /* ======================= Editor rows implementation ======================= */

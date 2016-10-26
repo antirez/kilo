@@ -908,14 +908,14 @@ void editorSetStatusMessage(const char *fmt, ...) {
 /* ========================= Editor events handling  ======================== */
 
 /* Handle cursor position change because arrow keys were pressed. */
-void editorMoveCursor(int key) {
+void editorMoveCursor(enum DIRECTION dir) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
     int rowlen;
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
-    switch(key) {
-    case ARROW_LEFT:
+    switch(dir) {
+    case LEFT:
         if (E.cx == 0) {
             if (E.coloff) {
                 E.coloff--;
@@ -933,7 +933,7 @@ void editorMoveCursor(int key) {
             E.cx -= 1;
         }
         break;
-    case ARROW_RIGHT:
+    case RIGHT:
         if (row && filecol < row->size) {
             if (E.cx == E.screencols-1) {
                 E.coloff++;
@@ -950,14 +950,14 @@ void editorMoveCursor(int key) {
             }
         }
         break;
-    case ARROW_UP:
+    case UP:
         if (E.cy == 0) {
             if (E.rowoff) E.rowoff--;
         } else {
             E.cy -= 1;
         }
         break;
-    case ARROW_DOWN:
+    case DOWN:
         if (filerow < E.numrows) {
             if (E.cy == E.screenrows-1) {
                 E.rowoff++;
@@ -980,6 +980,7 @@ void editorMoveCursor(int key) {
         }
     }
 }
+
 int editorFileWasModified(void) {
     return E.dirty;
 }
