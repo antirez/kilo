@@ -6,4 +6,8 @@
 void editorUpdateSyntax(erow *raw);
 int editorSyntaxToColor(int hl);
 
+extern struct editorSyntax HLDB[1];
+
+#define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
+
 #endif
