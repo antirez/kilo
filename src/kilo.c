@@ -58,6 +58,8 @@
 
 struct editorConfig E;
 
+FILE *logfile;
+
 void editorSetStatusMessage(const char *fmt, ...);
 
 /* ======================= Low level terminal handling ====================== */
@@ -772,6 +774,14 @@ done:
   return str;
 }
 
+void openLogFile(char *filename) {
+  logfile = fopen(filename, "w+");
+}
+
+void logmsg(char *msg) {
+  fprintf(logfile, "%s\n", msg);
+}
+
 /* ========================= Editor events handling  ======================== */
 
 /* Handle cursor position change because arrow keys were pressed. */
@@ -877,6 +887,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    openLogFile(LOG_FILENAME);
+    logmsg("editor is initializing");
     initEditor();
     initUser();
     editorSelectSyntaxHighlight(argv[1]);

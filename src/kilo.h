@@ -93,6 +93,8 @@ enum KEY_ACTION {
 #define HL_HIGHLIGHT_STRINGS (1<<0)
 #define HL_HIGHLIGHT_NUMBERS (1<<1)
 
+#define LOG_FILENAME "kilo.log"
+
 extern struct editorConfig E;
 
 void editorSetStatusMessage(const char *fmt, ...);
@@ -122,6 +124,6 @@ int editorOpen(char *filename);
 
 int editorSave();
 
-int editorHandleFunctionCall();
+void logmsg(char *msg);
 
 #endif
