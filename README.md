@@ -1,4 +1,4 @@
-Kilo
+Kilo (soon to be renamed Mega)
 ===
 
 Kilo is a small text editor in less than 1K lines of code (counted with cloc).
