@@ -126,4 +126,6 @@ int editorSave();
 
 void logmsg(char *fmt, ...);
 
+void editorQuit(int force);
+
 #endif

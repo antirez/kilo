@@ -2,11 +2,12 @@
 
 #include <stdio.h>
 #include "trie.h"
+#include "kilo.h"
 
 static struct trie colonFunctions;
 
 void (*lookupColonFunction(char *name))() {
-  return trieLookup(&colonFunctions, name);
+  return (void (*)())trieLookup(&colonFunctions, name);
 }
 
 int handleColonFunction(char *name) {
@@ -20,5 +21,5 @@ int handleColonFunction(char *name) {
 }
 
 void registerColonFunction(char *name, void (*func)()) {
-  trieAddKeyValue(&colonFunctions, name, func);
+  trieAddKeyValue(&colonFunctions, name, (void*)func);
 }
