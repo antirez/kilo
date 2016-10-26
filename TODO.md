@@ -1,5 +1,0 @@
-- [ ] create a src file for kilo core
-- [ ] create a config file for user configuration
-- [ ] move keyboard input handling into configuration
-- [ ] add an init function to configuration
-- [ ] discuss event system with erik
