@@ -54,6 +54,7 @@
 #include "kilo.h"
 #include "process_keypress.h"
 #include "function.h"
+#include "init.h"
 
 struct editorConfig E;
 
@@ -1010,6 +1011,7 @@ int main(int argc, char **argv) {
     }
 
     initEditor();
+    initUser();
     editorSelectSyntaxHighlight(argv[1]);
     editorOpen(argv[1]);
     enableRawMode(STDIN_FILENO);
