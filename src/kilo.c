@@ -778,8 +778,10 @@ void openLogFile(char *filename) {
   logfile = fopen(filename, "w+");
 }
 
-void logmsg(char *msg) {
-  fprintf(logfile, "%s\n", msg);
+void logmsg(char *fmt, ...) {
+  va_list vl;
+  va_start(vl, fmt);
+  vfprintf(logfile, fmt, vl);
 }
 
 /* ========================= Editor events handling  ======================== */
@@ -888,7 +890,7 @@ int main(int argc, char **argv) {
     }
 
     openLogFile(LOG_FILENAME);
-    logmsg("editor is initializing");
+    logmsg("editor is initializing\n");
     initEditor();
     initUser();
     editorSelectSyntaxHighlight(argv[1]);

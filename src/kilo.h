@@ -124,6 +124,6 @@ int editorOpen(char *filename);
 
 int editorSave();
 
-void logmsg(char *msg);
+void logmsg(char *fmt, ...);
 
 #endif
