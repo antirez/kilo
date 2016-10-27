@@ -109,3 +109,12 @@ void quitWithPrompt() {
 void quitForce() {
   editorQuit(1);
 }
+
+void saveIgnoreError() {
+  editorSave();
+}
+
+void saveAndQuit() {
+  saveIgnoreError();
+  quitWithPrompt();
+}
