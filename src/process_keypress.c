@@ -90,6 +90,8 @@ void editorProcessKeypress(int fd) {
     case 'v':
       if (mode == VM_VISUAL_CHAR) {
         mode = VM_NORMAL;
+        E.selection_row = -1;
+        E.selection_offset = 0;
         editorSetStatusMessage("INSERT");
         break;
       }
@@ -103,11 +105,15 @@ void editorProcessKeypress(int fd) {
     case 'V':
       if (mode == VM_VISUAL_LINE) {
         mode = VM_NORMAL;
+        E.selection_row = -1;
+        E.selection_offset = 0;
         editorSetStatusMessage("INSERT");
         break;
       }
-      if (mode == VM_NORMAL)
+      if (mode == VM_NORMAL) {
         E.selection_row = E.rowoff + E.cy;
+        E.selection_offset = 0;
+      }
       mode = VM_VISUAL_LINE;
       editorSetStatusMessage("VISUAL LINE");
       break;
@@ -119,6 +125,8 @@ void editorProcessKeypress(int fd) {
         else if (mode == VM_VISUAL_LINE)
           editorDeleteRows(E.selection_row, E.cy + E.rowoff);
         mode = VM_NORMAL;
+        E.selection_row = -1;
+        E.selection_offset = 0;
         editorSetStatusMessage("NORMAL");
         break;
       }
@@ -128,7 +136,7 @@ void editorProcessKeypress(int fd) {
       break;
     case ESC:
       if (mode != VM_NORMAL) {
-        E.selection_row = 0;
+        E.selection_row = -1;
         E.selection_offset = 0;
       }
       break;
