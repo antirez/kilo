@@ -1,5 +1,4 @@
 #include "colon.h"
-
 #include <stdio.h>
 #include "trie.h"
 #include "kilo.h"
