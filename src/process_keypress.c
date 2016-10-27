@@ -70,12 +70,12 @@ void editorProcessKeypress(int fd) {
       editorMoveCursor(RIGHT);
       break;
 	case 'o':
-	  editorInsertRow(E.cy + E.rowoff + 1, "\n", 0);
+	  editorInsertRow(E.cy + E.rowoff + 1, "", 0);
 	  editorMoveCursor(DOWN);
       mode = VM_INSERT;
       break;
 	case 'O':
-      editorInsertRow(E.cy + E.rowoff, "\n", 0);
+      editorInsertRow(E.cy + E.rowoff, "", 0);
       mode = VM_INSERT;
       break;
     case 'q':
