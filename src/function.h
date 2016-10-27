@@ -11,5 +11,7 @@ void editorFind(int fd);
 
 void quitWithPrompt();
 void quitForce();
+void saveIgnoreError();
+void saveAndQuit();
 
 #endif
