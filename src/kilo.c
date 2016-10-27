@@ -318,38 +318,43 @@ void editorDelRow(int at) {
     E.dirty++;
 }
 
-void editorDeleteLines(int brow, int erow) {
-  if (brow > erow)
-    SWAP(brow, erow);
+void editorDeleteRows(int begin_row, int end_row) {
+  if (begin_row > end_row)
+    SWAP(begin_row, end_row);
 
-  int iter = erow - brow;
-  int uppos = E.cy + E.rowoff - iter;
-  if (uppos < 0)
-    uppos = 0;
-
+  int iter = end_row - begin_row + 1;
   while (iter--)
-    editorDelRow(brow);
-
-  E.cy = uppos;
+    editorDelRow(begin_row);
 }
 
-void editorDeleteSelection(int brow, int bpos, int erow, int epos) {
-  if (bpos > epos)
-    SWAP(bpos, epos);
-
-  /* Join the begin of brow and the end of erow together */
-  if (bpos > E.row[brow].size || epos > E.row[erow].size)
+void editorDeleteSelection(int begin_row, int begin_col, int end_row,
+                           int end_col) {
+  if (begin_col > E.row[begin_row].size || end_col > E.row[end_row].size)
     return;
-  char *begin = strndup(E.row[brow].chars, bpos);
-  char *end = strdup(E.row[erow].chars + epos + 1);
-  int size = bpos + strlen(end);
+
+  char *begin, *end;
+
+  if (begin_row > end_row || (begin_row == end_row && begin_col > end_col)) {
+    begin = strndup(E.row[end_row].chars, end_col);
+    end = strdup(E.row[begin_row].chars + begin_col + 1);
+  } else {
+    /* Join the begin of begin_row and the end of end_row together */
+    begin = strndup(E.row[begin_row].chars, begin_col);
+    end = strdup(E.row[end_row].chars + end_col + 1);
+  }
+
+  int size = strlen(begin) + strlen(end);
+
   begin = realloc(begin, size + 1);
   strcat(begin, end);
 
-  editorDeleteLines(brow, erow + 1);
-  editorInsertRow(brow, begin, size);
+  editorDeleteRows(begin_row, end_row);
+  editorInsertRow(begin_row < end_row ? begin_row : end_row, begin, size);
 
-  E.cx = bpos;
+  free(end);
+  free(begin);
+
+  E.cx = begin_col < end_col ? begin_col : end_col;
 }
 
 /* Turn the editor rows into a single heap-allocated string.

@@ -1,6 +1,7 @@
 #ifndef KILO_KILO_H
 #define KILO_KILO_H
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
@@ -114,7 +115,7 @@ void editorInsertRow(int at, char *s, size_t len);
 void editorFreeRow(erow *row);
 void editorDelRow(int at);
 void editorDeleteSelection(int brow, int bcol, int erow, int ecol);
-void editorDeleteLines(int brow, int erow);
+void editorDeleteRows(int brow, int erow);
 char *editorRowsToString(int *buflen);
 void editorRowInsertChar(erow *row, int at, int c);
 void editorRowAppendString(erow *row, char *s, size_t len);
@@ -134,9 +135,9 @@ void editorQuit(int force);
 
 #define SWAP(a, b)                                                             \
   do {                                                                         \
-    a = a ^ b;                                                                 \
-    b = a ^ b;                                                                 \
-    a = a ^ b;                                                                 \
+    (a) = (a) ^ (b);                                                           \
+    (b) = (a) ^ (b);                                                           \
+    (a) = (a) ^ (b);                                                           \
   } while (0)
 
 #endif

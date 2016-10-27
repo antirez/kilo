@@ -108,7 +108,7 @@ void editorProcessKeypress(int fd) {
           editorDeleteSelection(E.selection_row, E.selection_offset,
                                 E.cy + E.rowoff, E.cx + E.coloff);
         else if (mode == VM_VISUAL_LINE)
-          editorDeleteLines(E.selection_row, E.cy + E.rowoff);
+          editorDeleteRows(E.selection_row, E.cy + E.rowoff);
         mode = VM_NORMAL;
         editorSetStatusMessage("NORMAL");
         break;
