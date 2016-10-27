@@ -74,6 +74,10 @@ void editorProcessKeypress(int fd) {
       editorMoveCursor(DOWN);
       mode = VM_INSERT;
 	  break;
+	case 'O':
+	  editorInsertRow(E.cy + E.rowoff, "\n", 0);
+	  mode = VM_INSERT;
+	  break;
     case 'q':
       exit(0);
     case 'i':
