@@ -102,16 +102,10 @@ void editorFind(int fd) {
     }
 }
 
-void quit() {
-  if (E.dirty) {
-    editorSetStatusMessage("WARNING!!! File has unsaved changes."
-                           "Do you want to continue? (y/n)");
-    editorRefreshScreen();
-    char c = editorReadKey(STDIN_FILENO);
-    if (!(c == 'y' || c == 'Y')) {
-      editorSetStatusMessage("");
-      return;
-    }
-  }
-  exit(0);
+void quitWithPrompt() {
+  editorQuit(0);
+}
+
+void quitForce() {
+  editorQuit(1);
 }

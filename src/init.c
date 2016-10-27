@@ -3,5 +3,6 @@
 #include "colon.h"
 
 void initUser(void) {
-  registerColonFunction("q", &quit);
+  registerColonFunction("q", &quitWithPrompt);
+  registerColonFunction("q!", &quitForce);
 }

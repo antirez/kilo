@@ -8,6 +8,8 @@
 #define KILO_QUERY_LEN 256
 
 void editorFind(int fd);
-void quit();
+
+void quitWithPrompt();
+void quitForce();
 
 #endif

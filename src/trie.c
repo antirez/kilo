@@ -1,7 +1,8 @@
 #include "trie.h"
-
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include "kilo.h"
 
 struct trie *newTrie() {
   struct trie *t = (struct trie*)malloc(sizeof(struct trie));
@@ -12,9 +13,13 @@ struct trie *newTrie() {
 }
 
 void trieAddKeyValue(struct trie *t, char *key, void *value) {
-  struct trie *n = newTrie();
-  t->next[(int)*key] = n;
-  n->node = *key;
+  struct trie *n = t->next[(int)*key];
+  if (n == NULL) {
+    n = newTrie();
+    n->node = *key;
+    t->next[(int)*key] = n;
+  }
+
   // set the value if this is the last byte of the key
   if (*(key+1) == '\0') {
     n->value = value;

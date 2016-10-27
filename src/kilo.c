@@ -537,6 +537,20 @@ writeerr:
     return 1;
 }
 
+void editorQuit(int force) {
+  if (E.dirty && !force) {
+    editorSetStatusMessage("WARNING!!! File has unsaved changes."
+                           "Do you want to continue? (y/n)");
+    editorRefreshScreen();
+    char c = editorReadKey(STDIN_FILENO);
+    if (!(c == 'y' || c == 'Y')) {
+      editorSetStatusMessage("");
+      return;
+    }
+  }
+  exit(0);
+}
+
 /* ============================= Terminal update ============================ */
 
 /* We define a very simple "append buffer" structure, that is an heap

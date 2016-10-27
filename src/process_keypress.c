@@ -22,9 +22,6 @@ void editorProcessKeypress(int fd) {
       /* We ignore ctrl-c, it can't be so simple to lose the changes
        * to the edited file. */
       break;
-    case CTRL_Q: /* Ctrl-q */
-      quit(); // TODO fd vs STDIN_FILENO
-      break;
     case CTRL_S: /* Ctrl-s */
       editorSave();
       break;
@@ -72,6 +69,8 @@ void editorProcessKeypress(int fd) {
     case 'l':
       editorMoveCursor(RIGHT);
       break;
+    case 'q':
+      exit(0);
     case 'i':
       mode = VM_INSERT;
       editorSetStatusMessage("INSERT");
