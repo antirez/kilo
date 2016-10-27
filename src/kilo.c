@@ -875,10 +875,15 @@ void editorMoveCursor(enum DIRECTION dir) {
 }
 
 void editorMoveCursorToRowEnd() {
-    int size = E.row[E.rowoff+E.cy].size;
-    while (size != 0) {
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    int rowlen = row ? row->size : 0;
+    int size = rowlen - E.cx-E.coloff;
+    
+    while (size != 0 ) {
         editorMoveCursor(RIGHT);
-        size = size-1;
+        size = size -1;
     }
 }
 
