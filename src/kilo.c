@@ -874,6 +874,14 @@ void editorMoveCursor(enum DIRECTION dir) {
     }
 }
 
+void editorMoveCursorToRowEnd() {
+    int size = E.row[E.rowoff+E.cy].size;
+    while (size != 0) {
+        editorMoveCursor(RIGHT);
+        size = size-1;
+    }
+}
+
 int editorFileWasModified(void) {
     return E.dirty;
 }
