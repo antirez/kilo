@@ -930,6 +930,22 @@ void editorMoveCursor(enum DIRECTION dir) {
     }
 }
 
+void editorMoveCursorToRowEnd() {
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    if (row == NULL) {
+        return;
+    }
+    int rowlen = row ? row->size : 0;
+    int size = rowlen - E.cx-E.coloff;
+    
+    while (size != 0 ) {
+        editorMoveCursor(RIGHT);
+        size = size -1;
+    }
+}
+
 int editorFileWasModified(void) {
     return E.dirty;
 }
