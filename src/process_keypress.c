@@ -30,8 +30,8 @@ void editorProcessKeypress(int fd) {
       break;
     case ':': {
       char *fn = editorReadStringFromStatusBar(":");
-      if (fn)
-        handleColonFunction(fn);
+      if (fn && handleColonFunction(fn))
+        editorSetStatusMessage("function '%s' not found", fn);
       break;
     }
     case BACKSPACE: /* Backspace */
