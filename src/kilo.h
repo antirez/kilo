@@ -124,6 +124,7 @@ void editorInsertChar(int c);
 void editorInsertNewline(void);
 void editorDelChar();
 char *editorReadStringFromStatusBar(char *prefix);
+void editorMoveCursorToRowEnd(void);
 
 int editorOpen(char *filename);
 
