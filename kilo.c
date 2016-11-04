@@ -34,7 +34,7 @@
 
 #define KILO_VERSION "0.0.1"
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #define _GNU_SOURCE
 
 #include <termios.h>
@@ -42,7 +42,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <stdlib.h>
+#include <time.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
