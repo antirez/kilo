@@ -141,6 +141,8 @@ void editorProcessKeypress(int fd) {
       if (E.mode != VM_NORMAL) {
         E.selection_row = -1;
         E.selection_offset = 0;
+        E.mode = VM_NORMAL;
+        editorSetStatusMessage("NORMAL");
       }
       break;
     default:
