@@ -3,5 +3,6 @@
 
 int handleColonFunction(char *name);
 void registerColonFunction(char *name, void (*func)());
+char *lookupPartialColonFunction(char *partialName);
 
 #endif
