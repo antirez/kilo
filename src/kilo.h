@@ -154,6 +154,33 @@ static inline bool inclusive_clamp(int a, int b, int c) {
   return clamp(a, b, c) || c == a || c == b;
 }
 
+/* Stream over text, abstracts rows. */
+typedef struct { int x, y; } charIterator;
+static inline void incrementChar(charIterator *it) {
+  if (E.row[it->y].size == it->x) {
+    ++it->y;
+    it->x = 0;
+  } else
+    ++it->x;
+}
+
+static inline void decrementChar(charIterator *it) {
+  if (it->x == 0) {
+    it->y--;
+    it->x = E.row[it->y].size;
+  } else
+    --it->x;
+}
+
+static inline char loadChar(charIterator *it) {
+  if (!inclusive_clamp(0, E.numrows - 1, it->y) ||
+      !inclusive_clamp(0, E.row[it->y].size, it->x))
+    return '\0';
+  if (E.row[it->y].size == it->x)
+    return '\n';
+  return E.row[it->y].chars[it->x];
+}
+
 void editorUpdateRow(erow *row);
 void editorInsertRow(int at, char *s, size_t len);
 void editorFreeRow(erow *row);
@@ -172,6 +199,7 @@ bool editorIsPointInRegion(int x, int y);
 textObject editorSelectionAsTextObject(void);
 textObject editorWordAtPoint(int x, int y, bool isInner);
 textObject editorRegionObject(void);
+textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner);
 bool editorDeleteTextObject(textObject obj);
 
 int editorOpen(char *filename);

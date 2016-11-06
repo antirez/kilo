@@ -264,6 +264,47 @@ textObject editorWordAtPoint(int x, int y, bool isInner) {
   return (textObject){begin, y, end, y};
 }
 
+/* Balanced region selector. */
+textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner) {
+  charIterator *backwards = &(charIterator){x, y};
+  charIterator *forwards = &(charIterator){x, y};
+
+  if (loadChar(backwards) == '\0')
+    return EMPTY_TEXT_OBJECT;
+
+  int parenCount = 0;
+  if (isInner) {
+    for (;;) {
+      char c = loadChar(backwards);
+      if (c == '\0')
+        return EMPTY_TEXT_OBJECT;
+      if (c == rhs)
+        ++parenCount;
+      if (c == lhs)
+       if (!parenCount--)
+          break;
+      decrementChar(backwards);
+    }
+  }
+
+  parenCount = 0;
+  for (;;) {
+    char c = loadChar(forwards);
+    logmsg("%c\n", c);
+    if (c == '\0')
+      return EMPTY_TEXT_OBJECT;
+    if (c == lhs)
+      ++parenCount;
+    if (c == rhs)
+      if (parenCount-- == 0)
+        break;
+    incrementChar(forwards);
+  }
+
+  return (textObject){backwards->x + 1, backwards->y, forwards->x - 1,
+                      forwards->y};
+}
+
 textObject editorRegionObject() {
   if (cursorY() < regionY() ||
       (cursorY() == regionY() && cursorX() < regionX()))

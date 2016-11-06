@@ -30,6 +30,22 @@ textObject editorParseTextObject() {
   case 'w':
     obj = editorWordAtPoint(cursorX(), cursorY(), isInner);
     break;
+  case '(':
+  case ')':
+    return editorPairAtPoint(cursorX(), cursorY(), '(', ')', isInner);
+  case '{':
+  case '}':
+    return editorPairAtPoint(cursorX(), cursorY(), '{', '}', isInner);
+  case '<':
+  case '>':
+    return editorPairAtPoint(cursorX(), cursorY(), '<', '>', isInner);
+  case '[':
+  case ']':
+    return editorPairAtPoint(cursorX(), cursorY(), '[', ']', isInner);
+  case '"':
+  case '\'':
+    return editorPairAtPoint(cursorX(), cursorY(), c, c, isInner);
+
   default:
     return EMPTY_TEXT_OBJECT;
   }
