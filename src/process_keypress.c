@@ -175,6 +175,18 @@ void editorProcessKeypress(int fd) {
       ENTER_MODE(NORMAL);
       break;
     }
+    case 'w': {
+      textObject obj = editorWordAtPoint(cursorX(), cursorY(), false);
+      E.cx = obj.secondX - E.rowoff;
+      E.cy = obj.secondY - E.coloff;
+      break;
+    }
+    case 'b': {
+      textObject obj = editorWordAtPoint(cursorX(), cursorY(), true);
+      E.cx = obj.firstX - E.rowoff;
+      E.cy = obj.firstY - E.coloff;
+      break;
+    }
     case '%': {
       textObject obj = editorComplementTextObject(cursorX(), cursorY());
       if (obj.firstX == -1) {
