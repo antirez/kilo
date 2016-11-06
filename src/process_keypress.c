@@ -10,11 +10,11 @@
     editorSetStatusMessage(#NAME);                                             \
   } while (0)
 
-textObject editorParseTextObject() {
+static textObject editorParseTextObjectOverride(char override) {
   if (E.selection_row != -1)
     return editorRegionObject();
 
-  int c = editorReadKey(STDIN_FILENO);
+  int c = override ? override : editorReadKey(STDIN_FILENO);
 
   bool isInner = false;
   switch (c) {
@@ -28,7 +28,15 @@ textObject editorParseTextObject() {
 
   switch (c) {
   case 'w':
-    obj = editorWordAtPoint(cursorX(), cursorY(), isInner);
+    obj = editorWordAtPoint(cursorX(), cursorY(),
+                            isInner ? TOK_INNER : TOK_RIGHT);
+    break;
+  case 'b':
+    obj =
+        editorWordAtPoint(cursorX(), cursorY(), isInner ? TOK_INNER : TOK_LEFT);
+    break;
+  case '%':
+    obj = editorComplementTextObject(cursorX(), cursorY());
     break;
   case '(':
   case ')':
@@ -51,6 +59,10 @@ textObject editorParseTextObject() {
   }
 
   return obj;
+}
+
+static textObject editorParseTextObject() {
+  return editorParseTextObjectOverride('\0');
 }
 
 /* Process events arriving from the standard input, which is, the user
@@ -167,7 +179,7 @@ void editorProcessKeypress(int fd) {
       break;
     case 'd': {
       textObject obj = editorParseTextObject();
-      if (obj.firstX != -1)
+      if (!badTextObject(obj))
         editorDeleteTextObject(obj);
 
       E.selection_row = -1;
@@ -175,26 +187,14 @@ void editorProcessKeypress(int fd) {
       ENTER_MODE(NORMAL);
       break;
     }
-    case 'w': {
-      textObject obj = editorWordAtPoint(cursorX(), cursorY(), false);
-      E.cx = obj.secondX - E.rowoff;
-      E.cy = obj.secondY - E.coloff;
-      break;
-    }
-    case 'b': {
-      textObject obj = editorWordAtPoint(cursorX(), cursorY(), true);
-      E.cx = obj.firstX - E.rowoff;
-      E.cy = obj.firstY - E.coloff;
-      break;
-    }
+    case 'w':
+    case 'b':
     case '%': {
-      textObject obj = editorComplementTextObject(cursorX(), cursorY());
-      if (obj.firstX == -1) {
-        editorSetStatusMessage("Can't find complement of char '%c'",
-                               loadChar(&(charIterator){cursorX(), cursorY()}));
+      textObject obj = editorParseTextObjectOverride(c);
+      if (badTextObject(obj))
         break;
-      }
-      if (obj.firstX == cursorX()) {
+
+      if (obj.firstX == cursorX() && obj.firstY == cursorY()) {
         E.cx = obj.secondX - E.rowoff;
         E.cy = obj.secondY - E.coloff;
       } else {

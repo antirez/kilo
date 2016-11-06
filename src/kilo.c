@@ -250,21 +250,23 @@ void editorSelectSyntaxHighlight(char *filename) {
 
 /* ======================= Text Object helpers ============================== */
 
-textObject editorWordAtPoint(int x, int y, bool isInner) {
+textObject editorWordAtPoint(int x, int y, textObjectKind kind) {
   charIterator *forward = &(charIterator){x, y};
   charIterator *backward = &(charIterator){x, y};
 
-  if (isInner) {
+  if (kind == TOK_INNER || kind == TOK_LEFT) {
     while (loadChar(backward) && loadChar(backward) == ' ')
       decrementChar(backward);
     while (loadChar(backward) && loadChar(backward) != ' ')
       decrementChar(backward);
   }
 
-  while (loadChar(forward) && loadChar(forward) == ' ')
-    incrementChar(forward);
-  while (loadChar(forward) && loadChar(forward) != ' ')
-    incrementChar(forward);
+  if (kind == TOK_RIGHT) {
+    while (loadChar(forward) && loadChar(forward) == ' ')
+      incrementChar(forward);
+    while (loadChar(forward) && loadChar(forward) != ' ')
+      incrementChar(forward);
+  }
 
   return (textObject){backward->x, backward->y, forward->x, forward->y};
 }

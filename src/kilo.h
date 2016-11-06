@@ -119,6 +119,12 @@ typedef struct {
   int secondX, secondY;
 } textObject;
 
+typedef enum {
+  TOK_LEFT,
+  TOK_RIGHT,
+  TOK_INNER
+} textObjectKind;
+
 #define EMPTY_TEXT_OBJECT                       \
   (textObject) { -1, -1, -1, -1 }
 
@@ -197,7 +203,7 @@ void editorMoveCursorToRowEnd(void);
 bool editorIsPointInRegion(int x, int y);
 
 textObject editorSelectionAsTextObject(void);
-textObject editorWordAtPoint(int x, int y, bool isInner);
+textObject editorWordAtPoint(int x, int y, textObjectKind kind);
 textObject editorRegionObject(void);
 textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner);
 textObject editorComplementTextObject(int x, int y);
