@@ -2,12 +2,40 @@
 #include "colon.h"
 #include "function.h"
 #include "kilo.h"
+#include <unistd.h>
 
 #define ENTER_MODE(NAME)                                                       \
   do {                                                                         \
     E.mode = VM_##NAME;                                                        \
     editorSetStatusMessage(#NAME);                                             \
   } while (0)
+
+textObject editorParseTextObject() {
+  if (E.selection_row != -1)
+    return editorRegionObject();
+
+  int c = editorReadKey(STDIN_FILENO);
+
+  bool isInner = false;
+  switch (c) {
+  case 'i':
+    isInner = true;
+    c = editorReadKey(STDIN_FILENO);
+    break;
+  }
+
+  textObject obj;
+
+  switch (c) {
+  case 'w':
+    obj = editorWordAtPoint(cursorX(), cursorY(), isInner);
+    break;
+  default:
+    return EMPTY_TEXT_OBJECT;
+  }
+
+  return obj;
+}
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
@@ -121,19 +149,16 @@ void editorProcessKeypress(int fd) {
       }
       ENTER_MODE(VISUAL_LINE);
       break;
-    case 'd':
-      if (E.mode != VM_NORMAL) {
-        if (E.mode == VM_VISUAL_CHAR)
-          editorDeleteSelection(E.selection_row, E.selection_offset,
-                                E.cy + E.rowoff, E.cx + E.coloff);
-        else if (E.mode == VM_VISUAL_LINE)
-          editorDeleteRows(E.selection_row, E.cy + E.rowoff);
-        ENTER_MODE(NORMAL);
-        E.selection_row = -1;
-        E.selection_offset = 0;
-        break;
-      }
+    case 'd': {
+      textObject obj = editorParseTextObject();
+      if (obj.firstX != -1)
+        editorDeleteTextObject(obj);
+
+      E.selection_row = -1;
+      E.selection_offset = 0;
+      ENTER_MODE(NORMAL);
       break;
+    }
     case CTRL_L: /* ctrl+l, clear screen */
       /* Just refresh the line as side effect. */
       break;

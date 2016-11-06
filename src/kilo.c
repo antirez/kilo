@@ -248,6 +248,75 @@ void editorSelectSyntaxHighlight(char *filename) {
     }
 }
 
+/* ======================= Text Object helpers ============================== */
+
+textObject editorWordAtPoint(int x, int y, bool isInner) {
+  erow *row = &E.row[y];
+  assert(y < E.numrows && x < row->size);
+
+  int begin = x, end = x;
+  if (isInner)
+    while (begin && row->chars[begin] != ' ')
+      --begin;
+  while (end < row->size && row->chars[end] != ' ')
+    ++end;
+
+  return (textObject){begin, y, end, y};
+}
+
+textObject editorRegionObject() {
+  if (cursorY() < regionY() ||
+      (cursorY() == regionY() && cursorX() < regionX()))
+    return (textObject){cursorX(), cursorY(), regionX(), regionY()};
+  else
+    return (textObject){regionX(), regionY(), cursorX(), cursorY()};
+}
+
+static bool editorDeleteRows(textObject obj) {
+  if (badTextObject(obj))
+    return true;
+
+  int iter = obj.secondY - obj.firstY + 1;
+  while (iter--)
+    editorDelRow(obj.firstY);
+
+  E.cx = obj.firstX - E.rowoff;
+  E.cy = obj.firstY - E.coloff;
+
+  return false;
+}
+
+static bool editorDeleteSelection(textObject obj) {
+  if (badTextObject(obj))
+    return true;
+
+  char *begin, *end;
+
+  /* Join the begin of begin_row and the end of end_row together */
+  begin = strndup(E.row[obj.firstY].chars, obj.firstX);
+  end = strdup(E.row[obj.secondY].chars + obj.secondX + 1);
+  int size = strlen(begin) + strlen(end);
+
+  begin = realloc(begin, size + 1);
+  strcat(begin, end);
+
+  editorDeleteRows(obj);
+  editorInsertRow(obj.firstY, begin, size);
+
+  free(end);
+  free(begin);
+
+  E.cx = obj.firstX - E.coloff;
+  E.cy = obj.firstY - E.rowoff;
+  return false;
+}
+
+bool editorDeleteTextObject(textObject obj) {
+  if (E.mode == VM_VISUAL_LINE)
+    return editorDeleteRows(obj);
+  return editorDeleteSelection(obj);
+}
+
 /* ======================= Editor rows implementation ======================= */
 
 /* Update the rendered version and the syntax highlight of a row. */
@@ -318,45 +387,6 @@ void editorDelRow(int at) {
     for (int j = at; j < E.numrows-1; j++) E.row[j].idx++;
     E.numrows--;
     E.dirty++;
-}
-
-void editorDeleteRows(int begin_row, int end_row) {
-  if (begin_row > end_row)
-    SWAP(begin_row, end_row);
-
-  int iter = end_row - begin_row + 1;
-  while (iter--)
-    editorDelRow(begin_row);
-}
-
-void editorDeleteSelection(int begin_row, int begin_col, int end_row,
-                           int end_col) {
-  if (begin_col > E.row[begin_row].size || end_col > E.row[end_row].size)
-    return;
-
-  char *begin, *end;
-
-  if (begin_row > end_row || (begin_row == end_row && begin_col > end_col)) {
-    begin = strndup(E.row[end_row].chars, end_col);
-    end = strdup(E.row[begin_row].chars + begin_col + 1);
-  } else {
-    /* Join the begin of begin_row and the end of end_row together */
-    begin = strndup(E.row[begin_row].chars, begin_col);
-    end = strdup(E.row[end_row].chars + end_col + 1);
-  }
-
-  int size = strlen(begin) + strlen(end);
-
-  begin = realloc(begin, size + 1);
-  strcat(begin, end);
-
-  editorDeleteRows(begin_row, end_row);
-  editorInsertRow(begin_row < end_row ? begin_row : end_row, begin, size);
-
-  free(end);
-  free(begin);
-
-  E.cx = begin_col < end_col ? begin_col : end_col;
 }
 
 /* Turn the editor rows into a single heap-allocated string.

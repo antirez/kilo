@@ -114,6 +114,20 @@ enum KEY_ACTION {
 
 extern struct editorConfig E;
 
+typedef struct {
+  int firstX, firstY;
+  int secondX, secondY;
+} textObject;
+
+#define EMPTY_TEXT_OBJECT                       \
+  (textObject) { -1, -1, -1, -1 }
+
+static inline bool badTextObject(textObject obj) {
+  return obj.firstY < 0 || obj.firstY >= E.numrows || obj.secondY < 0 ||
+    obj.secondY >= E.numrows || obj.firstX >= E.row[obj.firstY].size ||
+    obj.secondX >= E.row[obj.secondY].size;
+}
+
 void editorSetStatusMessage(const char *fmt, ...);
 void editorRefreshScreen(void);
 
@@ -144,8 +158,6 @@ void editorUpdateRow(erow *row);
 void editorInsertRow(int at, char *s, size_t len);
 void editorFreeRow(erow *row);
 void editorDelRow(int at);
-void editorDeleteSelection(int brow, int bcol, int erow, int ecol);
-void editorDeleteRows(int brow, int erow);
 char *editorRowsToString(int *buflen);
 void editorRowInsertChar(erow *row, int at, int c);
 void editorRowAppendString(erow *row, char *s, size_t len);
@@ -156,6 +168,11 @@ void editorDelChar();
 char *editorReadStringFromStatusBar(char *prefix);
 void editorMoveCursorToRowEnd(void);
 bool editorIsPointInRegion(int x, int y);
+
+textObject editorSelectionAsTextObject(void);
+textObject editorWordAtPoint(int x, int y, bool isInner);
+textObject editorRegionObject(void);
+bool editorDeleteTextObject(textObject obj);
 
 int editorOpen(char *filename);
 
