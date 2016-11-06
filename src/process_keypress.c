@@ -1,7 +1,13 @@
 #include "process_keypress.h"
+#include "colon.h"
 #include "function.h"
 #include "kilo.h"
-#include "colon.h"
+
+#define ENTER_MODE(NAME)                                                       \
+  do {                                                                         \
+    E.mode = VM_##NAME;                                                        \
+    editorSetStatusMessage(#NAME);                                             \
+  } while (0)
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
@@ -71,54 +77,49 @@ void editorProcessKeypress(int fd) {
     case 'o':
       editorInsertRow(E.cy + E.rowoff + 1, "", 0);
       editorMoveCursor(DOWN);
-      E.mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'O':
       editorInsertRow(E.cy + E.rowoff, "", 0);
-      E.mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'A':
       editorMoveCursorToRowEnd();
-      E.mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'q':
       exit(0);
     case 'i':
-      editorSetStatusMessage("INSERT");
-      E.mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'x':
       editorDelChar();
       break;
     case 'v':
       if (E.mode == VM_VISUAL_CHAR) {
-        E.mode = VM_NORMAL;
+        ENTER_MODE(NORMAL);
         E.selection_row = -1;
         E.selection_offset = 0;
-        editorSetStatusMessage("INSERT");
         break;
       }
       if (E.mode == VM_NORMAL) {
         E.selection_row = E.rowoff + E.cy;
         E.selection_offset = E.coloff + E.cx;
       }
-      E.mode = VM_VISUAL_CHAR;
-      editorSetStatusMessage("VISUAL CHAR");
+      ENTER_MODE(VISUAL_CHAR);
       break;
     case 'V':
       if (E.mode == VM_VISUAL_LINE) {
-        E.mode = VM_NORMAL;
+        ENTER_MODE(NORMAL);
         E.selection_row = -1;
         E.selection_offset = 0;
-        editorSetStatusMessage("INSERT");
         break;
       }
       if (E.mode == VM_NORMAL) {
         E.selection_row = E.rowoff + E.cy;
         E.selection_offset = 0;
       }
-      E.mode = VM_VISUAL_LINE;
-      editorSetStatusMessage("VISUAL LINE");
+      ENTER_MODE(VISUAL_LINE);
       break;
     case 'd':
       if (E.mode != VM_NORMAL) {
@@ -127,10 +128,9 @@ void editorProcessKeypress(int fd) {
                                 E.cy + E.rowoff, E.cx + E.coloff);
         else if (E.mode == VM_VISUAL_LINE)
           editorDeleteRows(E.selection_row, E.cy + E.rowoff);
-        E.mode = VM_NORMAL;
+        ENTER_MODE(NORMAL);
         E.selection_row = -1;
         E.selection_offset = 0;
-        editorSetStatusMessage("NORMAL");
         break;
       }
       break;
@@ -141,8 +141,7 @@ void editorProcessKeypress(int fd) {
       if (E.mode != VM_NORMAL) {
         E.selection_row = -1;
         E.selection_offset = 0;
-        E.mode = VM_NORMAL;
-        editorSetStatusMessage("NORMAL");
+        ENTER_MODE(NORMAL);
       }
       break;
     default:
@@ -165,8 +164,7 @@ void editorProcessKeypress(int fd) {
       editorInsertNewline();
       break;
     case ESC:
-      E.mode = VM_NORMAL;
-      editorSetStatusMessage("NORMAL");
+      ENTER_MODE(NORMAL);
       break;
     default:
       editorInsertChar(c);
