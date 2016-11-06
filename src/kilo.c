@@ -745,6 +745,9 @@ void editorRefreshScreen(void) {
         cx += 7 - ((cx) % 8);
       cx++;
     }
+  } else {
+    /* We're in the status bar! */
+    cx += E.cx;
   }
   snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, cx);
   abAppend(&ab, buf, strlen(buf));
@@ -823,12 +826,14 @@ char *editorReadStringFromStatusBar(char *prefix) {
       goto fail;
 
     default:
-      if (endpos == bufsz)
-        str = realloc(str, bufsz *= 2);
-      memmove(str + inspos + 1, str + inspos, endpos - inspos + 1);
-      str[inspos++] = c;
-      endpos++;
-      E.cx++;
+      if (isprint(c)) {
+        if (endpos == bufsz)
+          str = realloc(str, bufsz *= 2);
+        memmove(str + inspos + 1, str + inspos, endpos - inspos + 1);
+        str[inspos++] = c;
+        endpos++;
+        E.cx++;
+      }
     }
   }
 
