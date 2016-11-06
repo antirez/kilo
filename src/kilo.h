@@ -130,8 +130,8 @@ typedef enum {
 
 static inline bool badTextObject(textObject obj) {
   return obj.firstY < 0 || obj.firstY >= E.numrows || obj.secondY < 0 ||
-    obj.secondY >= E.numrows || obj.firstX >= E.row[obj.firstY].size ||
-    obj.secondX >= E.row[obj.secondY].size;
+         obj.secondY >= E.numrows || obj.firstX > E.row[obj.firstY].size ||
+         obj.secondX > E.row[obj.secondY].size;
 }
 
 void editorSetStatusMessage(const char *fmt, ...);

@@ -367,7 +367,6 @@ textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner) {
   parenCount = 0;
   for (;;) {
     char c = loadChar(forwards);
-    logmsg("%c\n", c);
     if (c == '\0')
       return EMPTY_TEXT_OBJECT;
     if (c == lhs)
