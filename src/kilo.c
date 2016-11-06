@@ -251,17 +251,22 @@ void editorSelectSyntaxHighlight(char *filename) {
 /* ======================= Text Object helpers ============================== */
 
 textObject editorWordAtPoint(int x, int y, bool isInner) {
-  erow *row = &E.row[y];
-  assert(y < E.numrows && x < row->size);
+  charIterator *forward = &(charIterator){x, y};
+  charIterator *backward = &(charIterator){x, y};
 
-  int begin = x, end = x;
-  if (isInner)
-    while (begin && row->chars[begin] != ' ')
-      --begin;
-  while (end < row->size && row->chars[end] != ' ')
-    ++end;
+  if (isInner) {
+    while (loadChar(backward) && loadChar(backward) == ' ')
+      decrementChar(backward);
+    while (loadChar(backward) && loadChar(backward) != ' ')
+      decrementChar(backward);
+  }
 
-  return (textObject){begin, y, end, y};
+  while (loadChar(forward) && loadChar(forward) == ' ')
+    incrementChar(forward);
+  while (loadChar(forward) && loadChar(forward) != ' ')
+    incrementChar(forward);
+
+  return (textObject){backward->x, backward->y, forward->x, forward->y};
 }
 
 static char complementOf(char c) {
