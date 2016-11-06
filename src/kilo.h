@@ -30,6 +30,15 @@ typedef struct erow {
 
 typedef struct hlcolor { int r, g, b; } hlcolor;
 
+/* FIXME: This is a layering violation! */
+enum vimMode {
+  VM_NORMAL,
+  VM_VISUAL_CHAR,
+  VM_VISUAL_LINE,
+  VM_INSERT,
+};
+typedef enum vimMode vimMode;
+
 struct editorConfig {
   int cx, cy;     /* Cursor x and y position in characters */
   int rowoff;     /* Offset of row displayed. */
@@ -46,6 +55,7 @@ struct editorConfig {
   struct editorSyntax *syntax; /* Current syntax highlight, or NULL. */
   int selection_row;
   int selection_offset;
+  vimMode mode;
 };
 
 enum DIRECTION {
@@ -98,6 +108,10 @@ enum KEY_ACTION {
 
 #define LOG_FILENAME "kilo.log"
 
+#define bool _Bool
+#define true 1
+#define false 0
+
 extern struct editorConfig E;
 
 void editorSetStatusMessage(const char *fmt, ...);
@@ -109,6 +123,22 @@ void editorMoveCursor(enum DIRECTION dir);
 int getWindowSize(int ifd, int ofd, int *rows, int *cols);
 
 /* ======================= Editor rows implementation ======================= */
+
+/* Cursor's position in the text buffer. */
+static inline int cursorX() { return E.coloff + E.cx; }
+static inline int cursorY() { return E.rowoff + E.cy; }
+
+/* Region's position in the text buffer. */
+static inline int regionX() { return E.selection_offset; }
+static inline int regionY() { return E.selection_row; }
+
+/* Is c in between a and b? */
+static inline bool clamp(int a, int b, int c) {
+  return (c > b && c < a) || (c > a && c < b);
+}
+static inline bool inclusive_clamp(int a, int b, int c) {
+  return clamp(a, b, c) || c == a || c == b;
+}
 
 void editorUpdateRow(erow *row);
 void editorInsertRow(int at, char *s, size_t len);
@@ -125,6 +155,7 @@ void editorInsertNewline(void);
 void editorDelChar();
 char *editorReadStringFromStatusBar(char *prefix);
 void editorMoveCursorToRowEnd(void);
+bool editorIsPointInRegion(int x, int y);
 
 int editorOpen(char *filename);
 
