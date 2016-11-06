@@ -696,7 +696,8 @@ void editorRefreshScreen(void) {
       unsigned char *hl = r->hl + E.coloff;
       int j;
       for (j = 0; j < len; j++) {
-        if (E.selection_row != -1 && inRegion != editorIsPointInRegion(j, y)) {
+        if (E.selection_row != -1 &&
+            inRegion != editorIsPointInRegion(E.coloff + j, E.rowoff + y)) {
           if (inRegion)
             abAppend(&ab, T_INVERSE_END);
           else
