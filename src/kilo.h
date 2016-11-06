@@ -30,6 +30,15 @@ typedef struct erow {
 
 typedef struct hlcolor { int r, g, b; } hlcolor;
 
+/* FIXME: This is a layering violation! */
+enum vimMode {
+  VM_NORMAL,
+  VM_VISUAL_CHAR,
+  VM_VISUAL_LINE,
+  VM_INSERT,
+};
+typedef enum vimMode vimMode;
+
 struct editorConfig {
   int cx, cy;     /* Cursor x and y position in characters */
   int rowoff;     /* Offset of row displayed. */
@@ -46,6 +55,7 @@ struct editorConfig {
   struct editorSyntax *syntax; /* Current syntax highlight, or NULL. */
   int selection_row;
   int selection_offset;
+  vimMode mode;
 };
 
 enum DIRECTION {

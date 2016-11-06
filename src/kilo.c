@@ -626,18 +626,26 @@ static bool editorForwardRegion() {
 }
 
 bool editorIsPointInRegion(int x, int y) {
-  if (y != cursorY() && y != regionY())
-    return clamp(cursorY(), regionY(), y);
+  switch (E.mode) {
+  case VM_VISUAL_CHAR:
+    if (y != cursorY() && y != regionY())
+      return clamp(cursorY(), regionY(), y);
 
-  if (cursorY() == regionY())
-    return y == cursorY() && inclusive_clamp(cursorX(), regionX(), x);
+    if (cursorY() == regionY())
+      return y == cursorY() && inclusive_clamp(cursorX(), regionX(), x);
 
-  if (cursorY() == y)
-    return cursorY() < regionY() ? x >= cursorX() : x <= cursorX();
+    if (cursorY() == y)
+      return cursorY() < regionY() ? x >= cursorX() : x <= cursorX();
 
-  assert(regionY() == y);
+    assert(regionY() == y);
 
-  return cursorY() < regionY() ? x <= regionX() : x >= regionX();
+    return cursorY() < regionY() ? x <= regionX() : x >= regionX();
+  case VM_VISUAL_LINE:
+    return inclusive_clamp(cursorY(), regionY(), y);
+
+  default:
+    return false;
+  }
 }
 
 #define T_INVERSE_BEGIN "\x1b[7m"
