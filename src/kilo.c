@@ -37,6 +37,7 @@
 #define _BSD_SOURCE
 #define _GNU_SOURCE
 
+#include <assert.h>
 #include <termios.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -603,30 +604,56 @@ struct abuf {
 
 #define ABUF_INIT {NULL,0}
 
-void abAppend(struct abuf *ab, const char *s, int len) {
-    char *new = realloc(ab->b,ab->len+len);
+static inline void abAppendLen(struct abuf *ab, const char *s, int len) {
+  char *new = realloc(ab->b, ab->len + len);
 
-    if (new == NULL) return;
-    memcpy(new+ab->len,s,len);
-    ab->b = new;
-    ab->len += len;
+  if (new == NULL)
+    return;
+  memcpy(new + ab->len, s, len);
+  ab->b = new;
+  ab->len += len;
 }
 
-void abFree(struct abuf *ab) {
-    free(ab->b);
+static inline void abAppend(struct abuf *ab, const char *s) {
+  abAppendLen(ab, s, strlen(s));
 }
+
+static void abFree(struct abuf *ab) { free(ab->b); }
+
+/* Is the cursor past the point? */
+static bool editorForwardRegion() {
+  return cursorY() != regionY() ? regionY() > cursorY() : regionX() > cursorX();
+}
+
+bool editorIsPointInRegion(int x, int y) {
+  if (y != cursorY() && y != regionY())
+    return clamp(cursorY(), regionY(), y);
+
+  if (cursorY() == regionY())
+    return y == cursorY() && inclusive_clamp(cursorX(), regionX(), x);
+
+  if (cursorY() == y)
+    return cursorY() < regionY() ? x >= cursorX() : x <= cursorX();
+
+  assert(regionY() == y);
+
+  return cursorY() < regionY() ? x <= regionX() : x >= regionX();
+}
+
+#define T_INVERSE_BEGIN "\x1b[7m"
+#define T_INVERSE_END "\x1b[27m"
 
 /* This function writes the whole screen using VT100 escape characters
  * starting from the logical state of the editor in the global state 'E'. */
 void editorRefreshScreen(void) {
   int y;
-  int in_region = 0;
+  bool inRegion = false;
   erow *r;
   char buf[32];
   struct abuf ab = ABUF_INIT;
 
-  abAppend(&ab, "\x1b[?25l", 6); /* Hide cursor. */
-  abAppend(&ab, "\x1b[H", 3);    /* Go home. */
+  abAppend(&ab, "\x1b[?25l"); /* Hide cursor. */
+  abAppend(&ab, "\x1b[H");    /* Go home. */
   for (y = 0; y < E.screenrows; y++) {
     int filerow = E.rowoff + y;
 
@@ -638,14 +665,14 @@ void editorRefreshScreen(void) {
                      "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
         int padding = (E.screencols - welcomelen) / 2;
         if (padding) {
-          abAppend(&ab, "~", 1);
+          abAppend(&ab, "~");
           padding--;
         }
         while (padding--)
-          abAppend(&ab, " ", 1);
-        abAppend(&ab, welcome, welcomelen);
+          abAppend(&ab, " ");
+        abAppendLen(&ab, welcome, welcomelen);
       } else {
-        abAppend(&ab, "~\x1b[0K\r\n", 7);
+        abAppend(&ab, "~\x1b[0K\r\n");
       }
       continue;
     }
@@ -661,52 +688,49 @@ void editorRefreshScreen(void) {
       unsigned char *hl = r->hl + E.coloff;
       int j;
       for (j = 0; j < len; j++) {
-        if (E.selection_row != -1 &&
-            (E.selection_row == y && E.selection_offset == j) !=
-                (E.cy + E.coloff == y && E.cx + E.rowoff == j)) {
-          if (in_region) {
-            abAppend(&ab, "\x1b[27m", 5);
-            in_region = 0;
-          } else {
-            abAppend(&ab, "\x1b[7m", 4);
-            in_region = 1;
-          }
+        if (E.selection_row != -1 && inRegion != editorIsPointInRegion(j, y)) {
+          if (inRegion)
+            abAppend(&ab, T_INVERSE_END);
+          else
+            abAppend(&ab, T_INVERSE_BEGIN);
+
+          inRegion = !inRegion;
         }
         if (hl[j] == HL_NONPRINT) {
           char sym;
-          abAppend(&ab, "\x1b[7m", 4);
+          abAppend(&ab, "\x1b[7m");
           if (c[j] <= 26)
             sym = '@' + c[j];
           else
             sym = '?';
-          abAppend(&ab, &sym, 1);
-          abAppend(&ab, "\x1b[0m", 4);
+          abAppendLen(&ab, &sym, 1);
+          abAppend(&ab, "\x1b[0m");
         } else if (hl[j] == HL_NORMAL) {
           if (current_color != -1) {
-            abAppend(&ab, "\x1b[39m", 5);
+            abAppend(&ab, "\x1b[39m");
             current_color = -1;
           }
-          abAppend(&ab, c + j, 1);
+          abAppendLen(&ab, c + j, 1);
         } else {
           int color = editorSyntaxToColor(hl[j]);
           if (color != current_color) {
             char buf[16];
             int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
             current_color = color;
-            abAppend(&ab, buf, clen);
+            abAppendLen(&ab, buf, clen);
           }
-          abAppend(&ab, c + j, 1);
+          abAppendLen(&ab, c + j, 1);
         }
       }
     }
-    abAppend(&ab, "\x1b[39m", 5);
-    abAppend(&ab, "\x1b[0K", 4);
-    abAppend(&ab, "\r\n", 2);
+    abAppend(&ab, "\x1b[39m");
+    abAppend(&ab, "\x1b[0K");
+    abAppend(&ab, "\r\n");
   }
 
   /* Create a two rows status. First row: */
-  abAppend(&ab, "\x1b[0K", 4);
-  abAppend(&ab, "\x1b[7m", 4);
+  abAppend(&ab, "\x1b[0K");
+  abAppend(&ab, "\x1b[7m");
   char status[80], rstatus[80];
   int len = snprintf(status, sizeof(status), "%.20s - %d lines %s", E.filename,
                      E.numrows, E.dirty ? "(modified)" : "");
@@ -714,23 +738,23 @@ void editorRefreshScreen(void) {
                       E.numrows);
   if (len > E.screencols)
     len = E.screencols;
-  abAppend(&ab, status, len);
+  abAppendLen(&ab, status, len);
   while (len < E.screencols) {
     if (E.screencols - len == rlen) {
-      abAppend(&ab, rstatus, rlen);
+      abAppendLen(&ab, rstatus, rlen);
       break;
     } else {
-      abAppend(&ab, " ", 1);
+      abAppend(&ab, " ");
       len++;
     }
   }
-  abAppend(&ab, "\x1b[0m\r\n", 6);
+  abAppend(&ab, "\x1b[0m\r\n");
 
   /* Second row depends on E.statusmsg and the status message update time. */
-  abAppend(&ab, "\x1b[0K", 4);
+  abAppend(&ab, "\x1b[0K");
   int msglen = strlen(E.statusmsg);
   if (msglen && time(NULL) - E.statusmsg_time < 5)
-    abAppend(&ab, E.statusmsg, msglen <= E.screencols ? msglen : E.screencols);
+    abAppendLen(&ab, E.statusmsg, msglen <= E.screencols ? msglen : E.screencols);
 
   /* Put cursor at its current position. Note that the horizontal position
    * at which the cursor is displayed may be different compared to 'E.cx'
@@ -747,8 +771,8 @@ void editorRefreshScreen(void) {
     }
   }
   snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, cx);
-  abAppend(&ab, buf, strlen(buf));
-  abAppend(&ab, "\x1b[?25h", 6); /* Show cursor. */
+  abAppendLen(&ab, buf, strlen(buf));
+  abAppend(&ab, "\x1b[?25h"); /* Show cursor. */
   write(STDOUT_FILENO, ab.b, ab.len);
   abFree(&ab);
 }
