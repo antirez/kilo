@@ -621,11 +621,6 @@ static inline void abAppend(struct abuf *ab, const char *s) {
 
 static void abFree(struct abuf *ab) { free(ab->b); }
 
-/* Is the cursor past the point? */
-static bool editorForwardRegion() {
-  return cursorY() != regionY() ? regionY() > cursorY() : regionX() > cursorX();
-}
-
 bool editorIsPointInRegion(int x, int y) {
   switch (E.mode) {
   case VM_VISUAL_CHAR:
