@@ -55,6 +55,7 @@
 #include "process_keypress.h"
 #include "init.h"
 #include "syntax_highlighter.h"
+#include "colon.h"
 
 struct editorConfig E;
 
@@ -816,6 +817,22 @@ char *editorReadStringFromStatusBar(char *prefix) {
         editorRefreshScreen();
       }
       break;
+    case TAB: {
+      str[endpos] = '\0';
+      char *autocomplete = lookupPartialColonFunction(str);
+      if (autocomplete == NULL) {
+        break;
+      }
+      int autolen = strlen(autocomplete);
+      while (endpos + autolen >= bufsz) {
+        str = realloc(str, bufsz *= 2);
+      }
+      str = strcat(str, autocomplete);
+      endpos = endpos + autolen;
+      inspos = endpos;
+      break;
+    }
+
     case CTRL_C: /* Everything else: just bail out. */
     case CTRL_Q:
     case CTRL_S:
@@ -857,6 +874,7 @@ void logmsg(char *fmt, ...) {
   va_list vl;
   va_start(vl, fmt);
   vfprintf(logfile, fmt, vl);
+  fflush(logfile);
 }
 
 /* ========================= Editor events handling  ======================== */
@@ -982,7 +1000,7 @@ int main(int argc, char **argv) {
     }
 
     openLogFile(LOG_FILENAME);
-    logmsg("editor is initializing\n");
+    logmsg("editor is initializing...\n");
     initEditor();
     initUser();
     editorSelectSyntaxHighlight(argv[1]);
