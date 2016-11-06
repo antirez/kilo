@@ -599,19 +599,19 @@ void editorQuit(int force) {
  * write all the escape sequences in a buffer and flush them to the standard
  * output in a single call, to avoid flickering effects. */
 struct abuf {
-    char *b;
-    int len;
+  char *b;
+  int len, cap;
 };
 
-#define ABUF_INIT {NULL,0}
+static inline void abInit(struct abuf *ab, int init) {
+  ab->b = malloc(ab->cap = init);
+  ab->len = 0;
+}
 
 static inline void abAppendLen(struct abuf *ab, const char *s, int len) {
-  char *new = realloc(ab->b, ab->len + len);
-
-  if (new == NULL)
-    return;
-  memcpy(new + ab->len, s, len);
-  ab->b = new;
+  while (ab->cap < ab->len + len)
+    ab->b = realloc(ab->b, ab->cap *= 1.6f);
+  memcpy(ab->b + ab->len, s, len);
   ab->len += len;
 }
 
@@ -659,7 +659,8 @@ void editorRefreshScreen(void) {
   bool inRegion = false;
   erow *r;
   char buf[32];
-  struct abuf ab = ABUF_INIT;
+  struct abuf ab;
+  abInit(&ab, 4096);
 
   abAppend(&ab, "\x1b[?25l"); /* Hide cursor. */
   abAppend(&ab, "\x1b[H");    /* Go home. */
