@@ -175,6 +175,22 @@ void editorProcessKeypress(int fd) {
       ENTER_MODE(NORMAL);
       break;
     }
+    case '%': {
+      textObject obj = editorComplementTextObject(cursorX(), cursorY());
+      if (obj.firstX == -1) {
+        editorSetStatusMessage("Can't find complement of char '%c'",
+                               loadChar(&(charIterator){cursorX(), cursorY()}));
+        break;
+      }
+      if (obj.firstX == cursorX()) {
+        E.cx = obj.secondX - E.rowoff;
+        E.cy = obj.secondY - E.coloff;
+      } else {
+        E.cx = obj.firstX - E.rowoff;
+        E.cy = obj.firstY - E.coloff;
+      }
+      break;
+    }
     case CTRL_L: /* ctrl+l, clear screen */
       /* Just refresh the line as side effect. */
       break;

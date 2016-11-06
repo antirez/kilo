@@ -264,6 +264,76 @@ textObject editorWordAtPoint(int x, int y, bool isInner) {
   return (textObject){begin, y, end, y};
 }
 
+static char complementOf(char c) {
+  switch (c) {
+  case '(': return ')';
+  case '{': return '}';
+  case '<': return '>';
+  case '[': return ']';
+  case ')': return '(';
+  case '}': return '{';
+  case '>': return '<';
+  case ']': return '[';
+  }
+  return '\0';
+}
+
+static bool findNearestComplementableChar(charIterator *forward) {
+  charIterator *backward = &(charIterator){forward->x, forward->y};
+
+  for (;;) {
+    char forcomp = complementOf(loadChar(forward));
+    if (forcomp && forcomp < loadChar(forward))
+      break;
+    char backcomp = complementOf(loadChar(backward));
+    if (backcomp && backcomp > loadChar(backward))
+      break;
+
+    /* We've reached EOF. */
+    if (!loadChar(forward) || !loadChar(backward))
+      return true;
+    incrementChar(forward);
+    decrementChar(backward);
+  }
+
+  if (complementOf(loadChar(forward)) == '\0') {
+    forward->x = backward->x;
+    forward->y = backward->y;
+  }
+
+  return false;
+}
+
+textObject editorComplementTextObject(int x, int y) {
+  charIterator *iter = &(charIterator){x, y};
+  char point = loadChar(iter);
+  char complement = complementOf(point);
+  bool goRight = point < complement;
+
+  if (!complement) {
+    if (findNearestComplementableChar(iter))
+      return EMPTY_TEXT_OBJECT;
+    point = loadChar(iter);
+    complement = complementOf(point);
+    goRight = point < complement;
+  }
+
+  void (*increment)(charIterator * it) =
+      goRight ? incrementChar : decrementChar;
+
+  for (;;) {
+    char c = loadChar(iter);
+    if (c == '\0')
+      return EMPTY_TEXT_OBJECT;
+    if (c == complement)
+      break;
+    increment(iter);
+  }
+
+  return goRight ? (textObject){x, y, iter->x, iter->y}
+                 : (textObject){iter->x, iter->y, x, y};
+}
+
 /* Balanced region selector. */
 textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner) {
   charIterator *backwards = &(charIterator){x, y};
