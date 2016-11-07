@@ -8,5 +8,6 @@ void initUser(void) {
   registerColonFunction("q!", &quitForce);
   registerColonFunction("w", &saveIgnoreError);
   registerColonFunction("wq", &saveAndQuit);
-  registerColonFunction("b", &editorSwitchBuffer);
+  registerColonFunctionWithArg("b", &editorSwitchBuffer);
+  registerColonFunctionWithArg("e", &editorOpen);
 }

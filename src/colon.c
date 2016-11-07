@@ -1,7 +1,8 @@
 #include "colon.h"
-#include <stdio.h>
-#include "trie.h"
 #include "kilo.h"
+#include "trie.h"
+#include <stddef.h>
+#include <stdio.h>
 
 static struct trie colonFunctions;
 
@@ -44,20 +45,33 @@ done:
   return buf;
 }
 
-void (*lookupColonFunction(char *name))() {
-  return (void (*)())trieLookup(&colonFunctions, name);
+void *lookupColonFunction(char *name) {
+  return trieLookup(&colonFunctions, name);
 }
 
-int handleColonFunction(char *name) {
-  void (*func)() = lookupColonFunction(name);
-  if (func) {
-    func();
+int handleColonFunction(char *name, char *arg) {
+  void *func = lookupColonFunction(name);
+  logmsg("retreiving: %s: %p\n", name, func);
+  if (((ptrdiff_t)func) & 0x1) {
+    ptrdiff_t unmask = (ptrdiff_t)func ^ 0x1;
+    ((unaryColonFunction *)(void *)unmask)(arg);
+    return 0;
+  } else if (func) {
+    ((colonFunction *)func)();
     return 0;
   } else {
     return 1;
   }
 }
 
-void registerColonFunction(char *name, void (*func)()) {
-  trieAddKeyValue(&colonFunctions, name, (void*)func);
+void registerColonFunction(char *name, colonFunction *func) {
+  logmsg("registering %s: %p\n", name, func);
+  trieAddKeyValue(&colonFunctions, name, (void *)func);
+}
+
+void registerColonFunctionWithArg(char *name, unaryColonFunction *func) {
+  /* Tag pointer as taking an argument */
+  ptrdiff_t mask = (ptrdiff_t)func | 0x1;
+  logmsg("registering arg func %s: %p\n", name, func);
+  trieAddKeyValue(&colonFunctions, name, (void *)mask);
 }

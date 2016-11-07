@@ -251,10 +251,10 @@ textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner);
 textObject editorComplementTextObject(int x, int y);
 bool editorDeleteTextObject(textObject obj);
 
-int editorOpen(char *filename);
+bool editorOpen(char *filename);
 
 bufferConfig *editorFindBuffer(char *name);
-void editorSwitchBuffer();
+bool editorSwitchBuffer(char *);
 
 int editorSave();
 

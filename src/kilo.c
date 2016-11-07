@@ -70,10 +70,12 @@ void editorSetStatusMessage(const char *fmt, ...);
 static struct termios orig_termios; /* In order to restore at exit.*/
 
 void disableRawMode(int fd) {
+  int i;
+  for (i = 0; i < openBuffers.idx; ++i)
     /* Don't even check the return value as it's too late. */
-    if (buffer->rawmode) {
-        tcsetattr(fd,TCSAFLUSH,&orig_termios);
-        buffer->rawmode = 0;
+    if (((bufferConfig *)openBuffers.data[i])->rawmode) {
+      tcsetattr(fd, TCSAFLUSH, &orig_termios);
+      buffer->rawmode = 0;
     }
 }
 
@@ -669,16 +671,16 @@ void editorDelChar() {
     buffer->dirty++;
 }
 
-/* Load the specified program in the editor memory and returns 0 on success
- * or 1 on error. */
-int editorOpen(char *filename) {
+/* Load the specified program in the editor memory and returns false on success
+ * or true on error. */
+bool editorOpen(char *filename) {
     FILE *fp;
 
     /* If we already have this buffer open, then switch to it. */
     bufferConfig *config;
     if ((config = editorFindBuffer(filename))) {
       buffer = config;
-      return 0;
+      return false;
     }
 
     buffer = calloc(1, sizeof(bufferConfig));
@@ -702,7 +704,7 @@ int editorOpen(char *filename) {
         perror("Opening file");
         exit(1);
       }
-      return 1;
+      return true;
     }
 
     editorSelectSyntaxHighlight(filename);
@@ -718,7 +720,7 @@ int editorOpen(char *filename) {
     free(line);
     fclose(fp);
     buffer->dirty = 0;
-    return 0;
+    return false;
 }
 
 /* Save the current file on disk. Return 0 on success, 1 on error. */
@@ -1105,13 +1107,12 @@ bufferConfig *editorFindBuffer(char *name) {
   return NULL;
 }
 
-void editorSwitchBuffer() {
-  char *name = "";
+bool editorSwitchBuffer(char *name) {
   bufferConfig *cfg = editorFindBuffer(name);
   if (!cfg)
-    return;// true;
+    return true;
   buffer = cfg;
-  return;// false;
+  return false;
 }
 
 /* ========================= Editor events handling  ======================== */

@@ -93,8 +93,15 @@ void editorProcessKeypress(int fd) {
       break;
     case ':': {
       char *fn = editorReadStringFromStatusBar(":");
-      if (fn && handleColonFunction(fn))
-        editorSetStatusMessage("function '%s' not found", fn);
+      if (fn) {
+        char *arg = strchr(fn, ' ');
+        if (arg) {
+          *arg = '\0';
+          arg++;
+        }
+        if (handleColonFunction(fn, arg))
+          editorSetStatusMessage("function '%s' not found", fn);
+      }
       break;
     }
     case BACKSPACE: /* Backspace */
