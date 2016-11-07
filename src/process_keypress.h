@@ -8,6 +8,6 @@ enum vimMode {
 };
 
 void editorProcessKeypress(int fd);
-void moveCursorToFirst();
+int editorMoveCursorToFirst(char c);
 
 #endif

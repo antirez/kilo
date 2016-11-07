@@ -85,8 +85,9 @@ void editorProcessKeypress(int fd) {
       mode = VM_INSERT;
       break;
     case 'f':
-      editorMoveCursorToFirst(editorReadKey(STDIN_FILENO));
-      mode = VM_INSERT;
+      if (1 == editorMoveCursorToFirst(editorReadKey(STDIN_FILENO))) {
+        mode = VM_INSERT;
+      }
       break;
     case 'q':
       exit(0);
