@@ -173,7 +173,10 @@ char *C_HL_keywords[] = {
 char *PY_HL_extensions[] = {".py","python",NULL};
 char *PY_HL_keywords[] = {
 	"def","if","while","for","break","return","continue","else","elif",
-	"True","False","class",
+	"True","False","class","and","as","assert","del","except","except:",
+	"finally","finally:", "from","global","import","in","is","lambda",
+	"nonlocal","not","or","pass","raise","return","try:","try","with",
+	"yeild",
 	/* Python types */
 	"int|","str|","unicode|","dict|","float|","repr|","long|","eval|",
 	"tuple|","list|","set|","frozenset|","chr|","unichr|","ord|","hex|",
