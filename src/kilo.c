@@ -37,6 +37,7 @@
 #define _BSD_SOURCE
 #define _GNU_SOURCE
 
+#include <assert.h>
 #include <termios.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -55,6 +56,7 @@
 #include "process_keypress.h"
 #include "init.h"
 #include "syntax_highlighter.h"
+#include "colon.h"
 
 struct editorConfig E;
 
@@ -246,6 +248,192 @@ void editorSelectSyntaxHighlight(char *filename) {
     }
 }
 
+/* ======================= Text Object helpers ============================== */
+
+textObject editorWordAtPoint(int x, int y, textObjectKind kind) {
+  charIterator *forward = &(charIterator){x, y};
+  charIterator *backward = &(charIterator){x, y};
+
+  if (kind == TOK_INNER || kind == TOK_LEFT) {
+    while (loadChar(backward) && loadChar(backward) == ' ')
+      decrementChar(backward);
+    while (loadChar(backward) && loadChar(backward) != ' ')
+      decrementChar(backward);
+  }
+
+  if (kind == TOK_RIGHT) {
+    while (loadChar(forward) && loadChar(forward) == ' ')
+      incrementChar(forward);
+    while (loadChar(forward) && loadChar(forward) != ' ')
+      incrementChar(forward);
+  }
+
+  return (textObject){backward->x, backward->y, forward->x, forward->y};
+}
+
+static char complementOf(char c) {
+  switch (c) {
+  case '(': return ')';
+  case '{': return '}';
+  case '<': return '>';
+  case '[': return ']';
+  case ')': return '(';
+  case '}': return '{';
+  case '>': return '<';
+  case ']': return '[';
+  }
+  return '\0';
+}
+
+static bool findNearestComplementableChar(charIterator *forward) {
+  charIterator *backward = &(charIterator){forward->x, forward->y};
+
+  for (;;) {
+    char forcomp = complementOf(loadChar(forward));
+    if (forcomp && forcomp < loadChar(forward))
+      break;
+    char backcomp = complementOf(loadChar(backward));
+    if (backcomp && backcomp > loadChar(backward))
+      break;
+
+    /* We've reached EOF. */
+    if (!loadChar(forward) || !loadChar(backward))
+      return true;
+    incrementChar(forward);
+    decrementChar(backward);
+  }
+
+  if (complementOf(loadChar(forward)) == '\0') {
+    forward->x = backward->x;
+    forward->y = backward->y;
+  }
+
+  return false;
+}
+
+textObject editorComplementTextObject(int x, int y) {
+  charIterator *iter = &(charIterator){x, y};
+  char point = loadChar(iter);
+  char complement = complementOf(point);
+  bool goRight = point < complement;
+
+  if (!complement) {
+    if (findNearestComplementableChar(iter))
+      return EMPTY_TEXT_OBJECT;
+    point = loadChar(iter);
+    complement = complementOf(point);
+    goRight = point < complement;
+  }
+
+  void (*increment)(charIterator * it) =
+      goRight ? incrementChar : decrementChar;
+
+  for (;;) {
+    char c = loadChar(iter);
+    if (c == '\0')
+      return EMPTY_TEXT_OBJECT;
+    if (c == complement)
+      break;
+    increment(iter);
+  }
+
+  return goRight ? (textObject){x, y, iter->x, iter->y}
+                 : (textObject){iter->x, iter->y, x, y};
+}
+
+/* Balanced region selector. */
+textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner) {
+  charIterator *backwards = &(charIterator){x, y};
+  charIterator *forwards = &(charIterator){x, y};
+
+  if (loadChar(backwards) == '\0')
+    return EMPTY_TEXT_OBJECT;
+
+  int parenCount = 0;
+  if (isInner) {
+    for (;;) {
+      char c = loadChar(backwards);
+      if (c == '\0')
+        return EMPTY_TEXT_OBJECT;
+      if (c == rhs)
+        ++parenCount;
+      if (c == lhs)
+       if (!parenCount--)
+          break;
+      decrementChar(backwards);
+    }
+  }
+
+  parenCount = 0;
+  for (;;) {
+    char c = loadChar(forwards);
+    if (c == '\0')
+      return EMPTY_TEXT_OBJECT;
+    if (c == lhs)
+      ++parenCount;
+    if (c == rhs)
+      if (parenCount-- == 0)
+        break;
+    incrementChar(forwards);
+  }
+
+  return (textObject){backwards->x + 1, backwards->y, forwards->x - 1,
+                      forwards->y};
+}
+
+textObject editorRegionObject() {
+  if (cursorY() < regionY() ||
+      (cursorY() == regionY() && cursorX() < regionX()))
+    return (textObject){cursorX(), cursorY(), regionX(), regionY()};
+  else
+    return (textObject){regionX(), regionY(), cursorX(), cursorY()};
+}
+
+static bool editorDeleteRows(textObject obj) {
+  if (badTextObject(obj))
+    return true;
+
+  int iter = obj.secondY - obj.firstY + 1;
+  while (iter--)
+    editorDelRow(obj.firstY);
+
+  E.cx = obj.firstX - E.rowoff;
+  E.cy = obj.firstY - E.coloff;
+
+  return false;
+}
+
+static bool editorDeleteSelection(textObject obj) {
+  if (badTextObject(obj))
+    return true;
+
+  char *begin, *end;
+
+  /* Join the begin of begin_row and the end of end_row together */
+  begin = strndup(E.row[obj.firstY].chars, obj.firstX);
+  end = strdup(E.row[obj.secondY].chars + obj.secondX + 1);
+  int size = strlen(begin) + strlen(end);
+
+  begin = realloc(begin, size + 1);
+  strcat(begin, end);
+
+  editorDeleteRows(obj);
+  editorInsertRow(obj.firstY, begin, size);
+
+  free(end);
+  free(begin);
+
+  E.cx = obj.firstX - E.coloff;
+  E.cy = obj.firstY - E.rowoff;
+  return false;
+}
+
+bool editorDeleteTextObject(textObject obj) {
+  if (E.mode == VM_VISUAL_LINE)
+    return editorDeleteRows(obj);
+  return editorDeleteSelection(obj);
+}
+
 /* ======================= Editor rows implementation ======================= */
 
 /* Update the rendered version and the syntax highlight of a row. */
@@ -316,45 +504,6 @@ void editorDelRow(int at) {
     for (int j = at; j < E.numrows-1; j++) E.row[j].idx++;
     E.numrows--;
     E.dirty++;
-}
-
-void editorDeleteRows(int begin_row, int end_row) {
-  if (begin_row > end_row)
-    SWAP(begin_row, end_row);
-
-  int iter = end_row - begin_row + 1;
-  while (iter--)
-    editorDelRow(begin_row);
-}
-
-void editorDeleteSelection(int begin_row, int begin_col, int end_row,
-                           int end_col) {
-  if (begin_col > E.row[begin_row].size || end_col > E.row[end_row].size)
-    return;
-
-  char *begin, *end;
-
-  if (begin_row > end_row || (begin_row == end_row && begin_col > end_col)) {
-    begin = strndup(E.row[end_row].chars, end_col);
-    end = strdup(E.row[begin_row].chars + begin_col + 1);
-  } else {
-    /* Join the begin of begin_row and the end of end_row together */
-    begin = strndup(E.row[begin_row].chars, begin_col);
-    end = strdup(E.row[end_row].chars + end_col + 1);
-  }
-
-  int size = strlen(begin) + strlen(end);
-
-  begin = realloc(begin, size + 1);
-  strcat(begin, end);
-
-  editorDeleteRows(begin_row, end_row);
-  editorInsertRow(begin_row < end_row ? begin_row : end_row, begin, size);
-
-  free(end);
-  free(begin);
-
-  E.cx = begin_col < end_col ? begin_col : end_col;
 }
 
 /* Turn the editor rows into a single heap-allocated string.
@@ -597,36 +746,66 @@ void editorQuit(int force) {
  * write all the escape sequences in a buffer and flush them to the standard
  * output in a single call, to avoid flickering effects. */
 struct abuf {
-    char *b;
-    int len;
+  char *b;
+  int len, cap;
 };
 
-#define ABUF_INIT {NULL,0}
-
-void abAppend(struct abuf *ab, const char *s, int len) {
-    char *new = realloc(ab->b,ab->len+len);
-
-    if (new == NULL) return;
-    memcpy(new+ab->len,s,len);
-    ab->b = new;
-    ab->len += len;
+static inline void abInit(struct abuf *ab, int init) {
+  ab->b = malloc(ab->cap = init);
+  ab->len = 0;
 }
 
-void abFree(struct abuf *ab) {
-    free(ab->b);
+static inline void abAppendLen(struct abuf *ab, const char *s, int len) {
+  while (ab->cap < ab->len + len)
+    ab->b = realloc(ab->b, ab->cap *= 1.6f);
+  memcpy(ab->b + ab->len, s, len);
+  ab->len += len;
 }
+
+static inline void abAppend(struct abuf *ab, const char *s) {
+  abAppendLen(ab, s, strlen(s));
+}
+
+static void abFree(struct abuf *ab) { free(ab->b); }
+
+bool editorIsPointInRegion(int x, int y) {
+  switch (E.mode) {
+  case VM_VISUAL_CHAR:
+    if (y != cursorY() && y != regionY())
+      return clamp(cursorY(), regionY(), y);
+
+    if (cursorY() == regionY())
+      return y == cursorY() && inclusive_clamp(cursorX(), regionX(), x);
+
+    if (cursorY() == y)
+      return cursorY() < regionY() ? x >= cursorX() : x <= cursorX();
+
+    assert(regionY() == y);
+
+    return cursorY() < regionY() ? x <= regionX() : x >= regionX();
+  case VM_VISUAL_LINE:
+    return inclusive_clamp(cursorY(), regionY(), y);
+
+  default:
+    return false;
+  }
+}
+
+#define T_INVERSE_BEGIN "\x1b[7m"
+#define T_INVERSE_END "\x1b[27m"
 
 /* This function writes the whole screen using VT100 escape characters
  * starting from the logical state of the editor in the global state 'E'. */
 void editorRefreshScreen(void) {
   int y;
-  int in_region = 0;
+  bool inRegion = false;
   erow *r;
   char buf[32];
-  struct abuf ab = ABUF_INIT;
+  struct abuf ab;
+  abInit(&ab, 4096);
 
-  abAppend(&ab, "\x1b[?25l", 6); /* Hide cursor. */
-  abAppend(&ab, "\x1b[H", 3);    /* Go home. */
+  abAppend(&ab, "\x1b[?25l"); /* Hide cursor. */
+  abAppend(&ab, "\x1b[H");    /* Go home. */
   for (y = 0; y < E.screenrows; y++) {
     int filerow = E.rowoff + y;
 
@@ -638,14 +817,14 @@ void editorRefreshScreen(void) {
                      "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
         int padding = (E.screencols - welcomelen) / 2;
         if (padding) {
-          abAppend(&ab, "~", 1);
+          abAppend(&ab, "~");
           padding--;
         }
         while (padding--)
-          abAppend(&ab, " ", 1);
-        abAppend(&ab, welcome, welcomelen);
+          abAppend(&ab, " ");
+        abAppendLen(&ab, welcome, welcomelen);
       } else {
-        abAppend(&ab, "~\x1b[0K\r\n", 7);
+        abAppend(&ab, "~\x1b[0K\r\n");
       }
       continue;
     }
@@ -662,51 +841,49 @@ void editorRefreshScreen(void) {
       int j;
       for (j = 0; j < len; j++) {
         if (E.selection_row != -1 &&
-            (E.selection_row == y && E.selection_offset == j) !=
-                (E.cy + E.coloff == y && E.cx + E.rowoff == j)) {
-          if (in_region) {
-            abAppend(&ab, "\x1b[27m", 5);
-            in_region = 0;
-          } else {
-            abAppend(&ab, "\x1b[7m", 4);
-            in_region = 1;
-          }
+            inRegion != editorIsPointInRegion(E.coloff + j, E.rowoff + y)) {
+          if (inRegion)
+            abAppend(&ab, T_INVERSE_END);
+          else
+            abAppend(&ab, T_INVERSE_BEGIN);
+
+          inRegion = !inRegion;
         }
         if (hl[j] == HL_NONPRINT) {
           char sym;
-          abAppend(&ab, "\x1b[7m", 4);
+          abAppend(&ab, "\x1b[7m");
           if (c[j] <= 26)
             sym = '@' + c[j];
           else
             sym = '?';
-          abAppend(&ab, &sym, 1);
-          abAppend(&ab, "\x1b[0m", 4);
+          abAppendLen(&ab, &sym, 1);
+          abAppend(&ab, "\x1b[0m");
         } else if (hl[j] == HL_NORMAL) {
           if (current_color != -1) {
-            abAppend(&ab, "\x1b[39m", 5);
+            abAppend(&ab, "\x1b[39m");
             current_color = -1;
           }
-          abAppend(&ab, c + j, 1);
+          abAppendLen(&ab, c + j, 1);
         } else {
           int color = editorSyntaxToColor(hl[j]);
           if (color != current_color) {
             char buf[16];
             int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
             current_color = color;
-            abAppend(&ab, buf, clen);
+            abAppendLen(&ab, buf, clen);
           }
-          abAppend(&ab, c + j, 1);
+          abAppendLen(&ab, c + j, 1);
         }
       }
     }
-    abAppend(&ab, "\x1b[39m", 5);
-    abAppend(&ab, "\x1b[0K", 4);
-    abAppend(&ab, "\r\n", 2);
+    abAppend(&ab, "\x1b[39m");
+    abAppend(&ab, "\x1b[0K");
+    abAppend(&ab, "\r\n");
   }
 
   /* Create a two rows status. First row: */
-  abAppend(&ab, "\x1b[0K", 4);
-  abAppend(&ab, "\x1b[7m", 4);
+  abAppend(&ab, "\x1b[0K");
+  abAppend(&ab, "\x1b[7m");
   char status[80], rstatus[80];
   int len = snprintf(status, sizeof(status), "%.20s - %d lines %s", E.filename,
                      E.numrows, E.dirty ? "(modified)" : "");
@@ -714,23 +891,23 @@ void editorRefreshScreen(void) {
                       E.numrows);
   if (len > E.screencols)
     len = E.screencols;
-  abAppend(&ab, status, len);
+  abAppendLen(&ab, status, len);
   while (len < E.screencols) {
     if (E.screencols - len == rlen) {
-      abAppend(&ab, rstatus, rlen);
+      abAppendLen(&ab, rstatus, rlen);
       break;
     } else {
-      abAppend(&ab, " ", 1);
+      abAppend(&ab, " ");
       len++;
     }
   }
-  abAppend(&ab, "\x1b[0m\r\n", 6);
+  abAppend(&ab, "\x1b[0m\r\n");
 
   /* Second row depends on E.statusmsg and the status message update time. */
-  abAppend(&ab, "\x1b[0K", 4);
+  abAppend(&ab, "\x1b[0K");
   int msglen = strlen(E.statusmsg);
   if (msglen && time(NULL) - E.statusmsg_time < 5)
-    abAppend(&ab, E.statusmsg, msglen <= E.screencols ? msglen : E.screencols);
+    abAppendLen(&ab, E.statusmsg, msglen <= E.screencols ? msglen : E.screencols);
 
   /* Put cursor at its current position. Note that the horizontal position
    * at which the cursor is displayed may be different compared to 'E.cx'
@@ -745,10 +922,13 @@ void editorRefreshScreen(void) {
         cx += 7 - ((cx) % 8);
       cx++;
     }
+  } else {
+    /* We're in the status bar! */
+    cx += E.cx;
   }
   snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, cx);
-  abAppend(&ab, buf, strlen(buf));
-  abAppend(&ab, "\x1b[?25h", 6); /* Show cursor. */
+  abAppendLen(&ab, buf, strlen(buf));
+  abAppend(&ab, "\x1b[?25h"); /* Show cursor. */
   write(STDOUT_FILENO, ab.b, ab.len);
   abFree(&ab);
 }
@@ -813,6 +993,22 @@ char *editorReadStringFromStatusBar(char *prefix) {
         editorRefreshScreen();
       }
       break;
+    case TAB: {
+      str[endpos] = '\0';
+      char *autocomplete = lookupPartialColonFunction(str);
+      if (autocomplete == NULL) {
+        break;
+      }
+      int autolen = strlen(autocomplete);
+      while (endpos + autolen >= bufsz) {
+        str = realloc(str, bufsz *= 2);
+      }
+      str = strcat(str, autocomplete);
+      endpos = endpos + autolen;
+      inspos = endpos;
+      break;
+    }
+
     case CTRL_C: /* Everything else: just bail out. */
     case CTRL_Q:
     case CTRL_S:
@@ -823,12 +1019,14 @@ char *editorReadStringFromStatusBar(char *prefix) {
       goto fail;
 
     default:
-      if (endpos == bufsz)
-        str = realloc(str, bufsz *= 2);
-      memmove(str + inspos + 1, str + inspos, endpos - inspos + 1);
-      str[inspos++] = c;
-      endpos++;
-      E.cx++;
+      if (isprint(c)) {
+        if (endpos == bufsz)
+          str = realloc(str, bufsz *= 2);
+        memmove(str + inspos + 1, str + inspos, endpos - inspos + 1);
+        str[inspos++] = c;
+        endpos++;
+        E.cx++;
+      }
     }
   }
 
@@ -852,6 +1050,7 @@ void logmsg(char *fmt, ...) {
   va_list vl;
   va_start(vl, fmt);
   vfprintf(logfile, fmt, vl);
+  fflush(logfile);
 }
 
 /* ========================= Editor events handling  ======================== */
@@ -1009,7 +1208,7 @@ int main(int argc, char **argv) {
     }
 
     openLogFile(LOG_FILENAME);
-    logmsg("editor is initializing\n");
+    logmsg("editor is initializing...\n");
     initEditor();
     initUser();
     editorSelectSyntaxHighlight(argv[1]);

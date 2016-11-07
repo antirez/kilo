@@ -1,11 +1,71 @@
 #include <unistd.h>
 
 #include "process_keypress.h"
+#include "colon.h"
 #include "function.h"
 #include "kilo.h"
-#include "colon.h"
+#include <unistd.h>
 
-enum vimMode mode;
+#define ENTER_MODE(NAME)                                                       \
+  do {                                                                         \
+    E.mode = VM_##NAME;                                                        \
+    editorSetStatusMessage(#NAME);                                             \
+  } while (0)
+
+static textObject editorParseTextObjectOverride(char override) {
+  if (E.selection_row != -1)
+    return editorRegionObject();
+
+  int c = override ? override : editorReadKey(STDIN_FILENO);
+
+  bool isInner = false;
+  switch (c) {
+  case 'i':
+    isInner = true;
+    c = editorReadKey(STDIN_FILENO);
+    break;
+  }
+
+  textObject obj;
+
+  switch (c) {
+  case 'w':
+    obj = editorWordAtPoint(cursorX(), cursorY(),
+                            isInner ? TOK_INNER : TOK_RIGHT);
+    break;
+  case 'b':
+    obj =
+        editorWordAtPoint(cursorX(), cursorY(), isInner ? TOK_INNER : TOK_LEFT);
+    break;
+  case '%':
+    obj = editorComplementTextObject(cursorX(), cursorY());
+    break;
+  case '(':
+  case ')':
+    return editorPairAtPoint(cursorX(), cursorY(), '(', ')', isInner);
+  case '{':
+  case '}':
+    return editorPairAtPoint(cursorX(), cursorY(), '{', '}', isInner);
+  case '<':
+  case '>':
+    return editorPairAtPoint(cursorX(), cursorY(), '<', '>', isInner);
+  case '[':
+  case ']':
+    return editorPairAtPoint(cursorX(), cursorY(), '[', ']', isInner);
+  case '"':
+  case '\'':
+    return editorPairAtPoint(cursorX(), cursorY(), c, c, isInner);
+
+  default:
+    return EMPTY_TEXT_OBJECT;
+  }
+
+  return obj;
+}
+
+static textObject editorParseTextObject() {
+  return editorParseTextObjectOverride('\0');
+}
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
@@ -15,7 +75,8 @@ void editorProcessKeypress(int fd) {
 
   int c = editorReadKey(fd);
 
-  if (mode == VM_NORMAL || mode == VM_VISUAL_CHAR || mode == VM_VISUAL_LINE) {
+  if (E.mode == VM_NORMAL || E.mode == VM_VISUAL_CHAR ||
+      E.mode == VM_VISUAL_LINE) {
     switch (c) {
     case ENTER: /* Enter */
       editorMoveCursor(DOWN);
@@ -74,15 +135,15 @@ void editorProcessKeypress(int fd) {
     case 'o':
       editorInsertRow(E.cy + E.rowoff + 1, "", 0);
       editorMoveCursor(DOWN);
-      mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'O':
       editorInsertRow(E.cy + E.rowoff, "", 0);
-      mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'A':
       editorMoveCursorToRowEnd();
-      mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'f':
       if (1 == editorMoveCursorToFirst(editorReadKey(STDIN_FILENO))) {
@@ -92,70 +153,78 @@ void editorProcessKeypress(int fd) {
     case 'q':
       exit(0);
     case 'i':
-      editorSetStatusMessage("INSERT");
-      mode = VM_INSERT;
+      ENTER_MODE(INSERT);
       break;
     case 'x':
       editorDelChar();
       break;
     case 'v':
-      if (mode == VM_VISUAL_CHAR) {
-        mode = VM_NORMAL;
+      if (E.mode == VM_VISUAL_CHAR) {
+        ENTER_MODE(NORMAL);
         E.selection_row = -1;
         E.selection_offset = 0;
-        editorSetStatusMessage("INSERT");
         break;
       }
-      if (mode == VM_NORMAL) {
+      if (E.mode == VM_NORMAL) {
         E.selection_row = E.rowoff + E.cy;
         E.selection_offset = E.coloff + E.cx;
       }
-      mode = VM_VISUAL_CHAR;
-      editorSetStatusMessage("VISUAL CHAR");
+      ENTER_MODE(VISUAL_CHAR);
       break;
     case 'V':
-      if (mode == VM_VISUAL_LINE) {
-        mode = VM_NORMAL;
+      if (E.mode == VM_VISUAL_LINE) {
+        ENTER_MODE(NORMAL);
         E.selection_row = -1;
         E.selection_offset = 0;
-        editorSetStatusMessage("INSERT");
         break;
       }
-      if (mode == VM_NORMAL) {
+      if (E.mode == VM_NORMAL) {
         E.selection_row = E.rowoff + E.cy;
         E.selection_offset = 0;
       }
-      mode = VM_VISUAL_LINE;
-      editorSetStatusMessage("VISUAL LINE");
+      ENTER_MODE(VISUAL_LINE);
       break;
-    case 'd':
-      if (mode != VM_NORMAL) {
-        if (mode == VM_VISUAL_CHAR)
-          editorDeleteSelection(E.selection_row, E.selection_offset,
-                                E.cy + E.rowoff, E.cx + E.coloff);
-        else if (mode == VM_VISUAL_LINE)
-          editorDeleteRows(E.selection_row, E.cy + E.rowoff);
-        mode = VM_NORMAL;
-        E.selection_row = -1;
-        E.selection_offset = 0;
-        editorSetStatusMessage("NORMAL");
+    case 'd': {
+      textObject obj = editorParseTextObject();
+      if (!badTextObject(obj))
+        editorDeleteTextObject(obj);
+
+      E.selection_row = -1;
+      E.selection_offset = 0;
+      ENTER_MODE(NORMAL);
+      break;
+    }
+    case 'w':
+    case 'b':
+    case '%': {
+      textObject obj = editorParseTextObjectOverride(c);
+      if (badTextObject(obj))
         break;
+
+      if (obj.firstX == cursorX() && obj.firstY == cursorY()) {
+        E.cx = obj.secondX - E.rowoff;
+        E.cy = obj.secondY - E.coloff;
+      } else {
+        E.cx = obj.firstX - E.rowoff;
+        E.cy = obj.firstY - E.coloff;
       }
       break;
+    }
     case CTRL_L: /* ctrl+l, clear screen */
       /* Just refresh the line as side effect. */
       break;
     case ESC:
-      if (mode != VM_NORMAL) {
+      if (E.mode != VM_NORMAL) {
         E.selection_row = -1;
         E.selection_offset = 0;
+        ENTER_MODE(NORMAL);
       }
       break;
     default:
       /* Unhandled input, ignore. */
       break;
     }
-  } else if (mode == VM_INSERT) {
+  } else if (E.mode == VM_INSERT) {
     switch (c) {
     case ARROW_UP: // noob
     case ARROW_DOWN:
@@ -171,8 +240,7 @@ void editorProcessKeypress(int fd) {
       editorInsertNewline();
       break;
     case ESC:
-      mode = VM_NORMAL;
-      editorSetStatusMessage("NORMAL");
+      ENTER_MODE(NORMAL);
       break;
     default:
       editorInsertChar(c);

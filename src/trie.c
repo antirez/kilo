@@ -28,13 +28,17 @@ void trieAddKeyValue(struct trie *t, char *key, void *value) {
   }
 }
 
-void *trieLookup(struct trie *t, char *key) {
+struct trie *triePartialLookup(struct trie *t, char *key) {
   struct trie *next;
   if (*key == '\0') {
-    return t->value;
+    return t;
   } else if ((next = t->next[(int)*key])) {
-    return trieLookup(next, key+1);
+    return triePartialLookup(next, key+1);
   } else {
     return NULL;
   }
+}
+
+void *trieLookup(struct trie *t, char *key) {
+  return triePartialLookup(t, key)->value;
 }

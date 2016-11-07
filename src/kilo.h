@@ -30,6 +30,15 @@ typedef struct erow {
 
 typedef struct hlcolor { int r, g, b; } hlcolor;
 
+/* FIXME: This is a layering violation! */
+enum vimMode {
+  VM_NORMAL,
+  VM_VISUAL_CHAR,
+  VM_VISUAL_LINE,
+  VM_INSERT,
+};
+typedef enum vimMode vimMode;
+
 struct editorConfig {
   int cx, cy;     /* Cursor x and y position in characters */
   int rowoff;     /* Offset of row displayed. */
@@ -46,6 +55,7 @@ struct editorConfig {
   struct editorSyntax *syntax; /* Current syntax highlight, or NULL. */
   int selection_row;
   int selection_offset;
+  vimMode mode;
 };
 
 enum DIRECTION {
@@ -98,7 +108,31 @@ enum KEY_ACTION {
 
 #define LOG_FILENAME "kilo.log"
 
+#define bool _Bool
+#define true 1
+#define false 0
+
 extern struct editorConfig E;
+
+typedef struct {
+  int firstX, firstY;
+  int secondX, secondY;
+} textObject;
+
+typedef enum {
+  TOK_LEFT,
+  TOK_RIGHT,
+  TOK_INNER
+} textObjectKind;
+
+#define EMPTY_TEXT_OBJECT                       \
+  (textObject) { -1, -1, -1, -1 }
+
+static inline bool badTextObject(textObject obj) {
+  return obj.firstY < 0 || obj.firstY >= E.numrows || obj.secondY < 0 ||
+         obj.secondY >= E.numrows || obj.firstX > E.row[obj.firstY].size ||
+         obj.secondX > E.row[obj.secondY].size;
+}
 
 void editorSetStatusMessage(const char *fmt, ...);
 void editorRefreshScreen(void);
@@ -110,12 +144,53 @@ int getWindowSize(int ifd, int ofd, int *rows, int *cols);
 
 /* ======================= Editor rows implementation ======================= */
 
+/* Cursor's position in the text buffer. */
+static inline int cursorX() { return E.coloff + E.cx; }
+static inline int cursorY() { return E.rowoff + E.cy; }
+
+/* Region's position in the text buffer. */
+static inline int regionX() { return E.selection_offset; }
+static inline int regionY() { return E.selection_row; }
+
+/* Is c in between a and b? */
+static inline bool clamp(int a, int b, int c) {
+  return (c > b && c < a) || (c > a && c < b);
+}
+static inline bool inclusive_clamp(int a, int b, int c) {
+  return clamp(a, b, c) || c == a || c == b;
+}
+
+/* Stream over text, abstracts rows. */
+typedef struct { int x, y; } charIterator;
+static inline void incrementChar(charIterator *it) {
+  if (E.row[it->y].size == it->x) {
+    ++it->y;
+    it->x = 0;
+  } else
+    ++it->x;
+}
+
+static inline void decrementChar(charIterator *it) {
+  if (it->x == 0) {
+    it->y--;
+    it->x = E.row[it->y].size;
+  } else
+    --it->x;
+}
+
+static inline char loadChar(charIterator *it) {
+  if (!inclusive_clamp(0, E.numrows - 1, it->y) ||
+      !inclusive_clamp(0, E.row[it->y].size, it->x))
+    return '\0';
+  if (E.row[it->y].size == it->x)
+    return '\n';
+  return E.row[it->y].chars[it->x];
+}
+
 void editorUpdateRow(erow *row);
 void editorInsertRow(int at, char *s, size_t len);
 void editorFreeRow(erow *row);
 void editorDelRow(int at);
-void editorDeleteSelection(int brow, int bcol, int erow, int ecol);
-void editorDeleteRows(int brow, int erow);
 char *editorRowsToString(int *buflen);
 void editorRowInsertChar(erow *row, int at, int c);
 void editorRowAppendString(erow *row, char *s, size_t len);
@@ -125,6 +200,14 @@ void editorInsertNewline(void);
 void editorDelChar();
 char *editorReadStringFromStatusBar(char *prefix);
 void editorMoveCursorToRowEnd(void);
+bool editorIsPointInRegion(int x, int y);
+
+textObject editorSelectionAsTextObject(void);
+textObject editorWordAtPoint(int x, int y, textObjectKind kind);
+textObject editorRegionObject(void);
+textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner);
+textObject editorComplementTextObject(int x, int y);
+bool editorDeleteTextObject(textObject obj);
 
 int editorOpen(char *filename);
 
