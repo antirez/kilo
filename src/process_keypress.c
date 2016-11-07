@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include "process_keypress.h"
 #include "function.h"
 #include "kilo.h"
@@ -81,6 +83,11 @@ void editorProcessKeypress(int fd) {
     case 'A':
       editorMoveCursorToRowEnd();
       mode = VM_INSERT;
+      break;
+    case 'f':
+      if (1 == editorMoveCursorToFirst(editorReadKey(STDIN_FILENO))) {
+        mode = VM_INSERT;
+      }
       break;
     case 'q':
       exit(0);

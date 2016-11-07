@@ -309,7 +309,7 @@ void editorFreeRow(erow *row) {
 void editorDelRow(int at) {
     erow *row;
 
-    if (at >= E.numrows) return;
+    if(at >= E.numrows) return;
     row = E.row+at;
     editorFreeRow(row);
     memmove(E.row+at,E.row+at+1,sizeof(E.row[0])*(E.numrows-at-1));
@@ -939,11 +939,43 @@ void editorMoveCursorToRowEnd() {
     }
     int rowlen = row ? row->size : 0;
     int size = rowlen - E.cx-E.coloff;
-    
-    while (size != 0 ) {
+
+    while (size != 0) {
         editorMoveCursor(RIGHT);
         size = size -1;
     }
+}
+
+int editorMoveCursorToFirst(char c) {
+  int filerow = E.rowoff+E.cy;
+  erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+
+  if (row == NULL) {
+    return 0;
+  }
+
+  int rowlen = row ? row->size : 0;
+  int size = rowlen;
+
+  int i = E.cx-E.coloff;
+  int initialOffSet = E.cx-E.coloff;
+  int found = 0;
+
+  while (row->chars[i] != c && i != size) {
+    if (row->chars[i+1] == c) {
+      found = 1;
+    }
+    i++;
+  }
+
+  if (found == 1) {
+    while (i - initialOffSet != 0) {
+      i = i -1;
+      editorMoveCursor(RIGHT);
+    }
+    return 1;
+  }
+  return 0;
 }
 
 int editorFileWasModified(void) {

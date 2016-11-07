@@ -9,5 +9,6 @@ enum vimMode {
 };
 
 void editorProcessKeypress(int fd);
+int editorMoveCursorToFirst(char c);
 
 #endif
