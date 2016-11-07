@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include "process_keypress.h"
 #include "colon.h"
 #include "function.h"
@@ -142,6 +144,11 @@ void editorProcessKeypress(int fd) {
     case 'A':
       editorMoveCursorToRowEnd();
       ENTER_MODE(INSERT);
+      break;
+    case 'f':
+      if (editorMoveCursorToFirst(editorReadKey(STDIN_FILENO))) {
+        ENTER_MODE(INSERT);
+      }
       break;
     case 'q':
       exit(0);
