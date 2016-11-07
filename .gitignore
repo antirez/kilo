@@ -1,1 +1,3 @@
 kilo
+*.o
+kilo.log
