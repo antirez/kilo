@@ -1153,10 +1153,9 @@ bool editorMoveCursorToFirst(char c) {
     return 0;
   }
 
-  int rowlen = row ? row->size : 0;
-  int size = rowlen;
+  int size = row->size;
 
-  int i = E.cx-E.coloff;
+  int i = E.cx+E.coloff;
   int initialOffSet = cursorX();
   bool found = false;
 
