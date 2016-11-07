@@ -200,6 +200,7 @@ void editorInsertNewline(void);
 void editorDelChar();
 char *editorReadStringFromStatusBar(char *prefix);
 void editorMoveCursorToRowEnd(void);
+bool editorMoveCursorToFirst(char c);
 bool editorIsPointInRegion(int x, int y);
 
 textObject editorSelectionAsTextObject(void);

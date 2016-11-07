@@ -1145,7 +1145,7 @@ void editorMoveCursorToRowEnd() {
     }
 }
 
-int editorMoveCursorToFirst(char c) {
+bool editorMoveCursorToFirst(char c) {
   int filerow = E.rowoff+E.cy;
   erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
@@ -1157,24 +1157,23 @@ int editorMoveCursorToFirst(char c) {
   int size = rowlen;
 
   int i = E.cx-E.coloff;
-  int initialOffSet = E.cx-E.coloff;
-  int found = 0;
+  int initialOffSet = cursorX();
+  bool found = false;
 
   while (row->chars[i] != c && i != size) {
     if (row->chars[i+1] == c) {
-      found = 1;
+      found = true;
     }
     i++;
   }
 
-  if (found == 1) {
+  if (found == true) {
     while (i - initialOffSet != 0) {
-      i = i -1;
+      i--;
       editorMoveCursor(RIGHT);
     }
-    return 1;
   }
-  return 0;
+  return found;
 }
 
 int editorFileWasModified(void) {
