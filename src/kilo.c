@@ -318,6 +318,45 @@ void editorDelRow(int at) {
     E.dirty++;
 }
 
+void editorDeleteRows(int begin_row, int end_row) {
+  if (begin_row > end_row)
+    SWAP(begin_row, end_row);
+
+  int iter = end_row - begin_row + 1;
+  while (iter--)
+    editorDelRow(begin_row);
+}
+
+void editorDeleteSelection(int begin_row, int begin_col, int end_row,
+                           int end_col) {
+  if (begin_col > E.row[begin_row].size || end_col > E.row[end_row].size)
+    return;
+
+  char *begin, *end;
+
+  if (begin_row > end_row || (begin_row == end_row && begin_col > end_col)) {
+    begin = strndup(E.row[end_row].chars, end_col);
+    end = strdup(E.row[begin_row].chars + begin_col + 1);
+  } else {
+    /* Join the begin of begin_row and the end of end_row together */
+    begin = strndup(E.row[begin_row].chars, begin_col);
+    end = strdup(E.row[end_row].chars + end_col + 1);
+  }
+
+  int size = strlen(begin) + strlen(end);
+
+  begin = realloc(begin, size + 1);
+  strcat(begin, end);
+
+  editorDeleteRows(begin_row, end_row);
+  editorInsertRow(begin_row < end_row ? begin_row : end_row, begin, size);
+
+  free(end);
+  free(begin);
+
+  E.cx = begin_col < end_col ? begin_col : end_col;
+}
+
 /* Turn the editor rows into a single heap-allocated string.
  * Returns the pointer to the heap-allocated string and populate the
  * integer pointed by 'buflen' with the size of the string, escluding
@@ -580,121 +619,138 @@ void abFree(struct abuf *ab) {
 /* This function writes the whole screen using VT100 escape characters
  * starting from the logical state of the editor in the global state 'E'. */
 void editorRefreshScreen(void) {
-    int y;
-    erow *r;
-    char buf[32];
-    struct abuf ab = ABUF_INIT;
+  int y;
+  int in_region = 0;
+  erow *r;
+  char buf[32];
+  struct abuf ab = ABUF_INIT;
 
-    abAppend(&ab,"\x1b[?25l",6); /* Hide cursor. */
-    abAppend(&ab,"\x1b[H",3); /* Go home. */
-    for (y = 0; y < E.screenrows; y++) {
-        int filerow = E.rowoff+y;
+  abAppend(&ab, "\x1b[?25l", 6); /* Hide cursor. */
+  abAppend(&ab, "\x1b[H", 3);    /* Go home. */
+  for (y = 0; y < E.screenrows; y++) {
+    int filerow = E.rowoff + y;
 
-        if (filerow >= E.numrows) {
-            if (E.numrows == 0 && y == E.screenrows/3) {
-                char welcome[80];
-                int welcomelen = snprintf(welcome,sizeof(welcome),
-                    "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
-                int padding = (E.screencols-welcomelen)/2;
-                if (padding) {
-                    abAppend(&ab,"~",1);
-                    padding--;
-                }
-                while(padding--) abAppend(&ab," ",1);
-                abAppend(&ab,welcome,welcomelen);
-            } else {
-                abAppend(&ab,"~\x1b[0K\r\n",7);
-            }
-            continue;
+    if (filerow >= E.numrows) {
+      if (E.numrows == 0 && y == E.screenrows / 3) {
+        char welcome[80];
+        int welcomelen =
+            snprintf(welcome, sizeof(welcome),
+                     "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
+        int padding = (E.screencols - welcomelen) / 2;
+        if (padding) {
+          abAppend(&ab, "~", 1);
+          padding--;
         }
-
-        r = &E.row[filerow];
-
-        int len = r->rsize - E.coloff;
-        int current_color = -1;
-        if (len > 0) {
-            if (len > E.screencols) len = E.screencols;
-            char *c = r->render+E.coloff;
-            unsigned char *hl = r->hl+E.coloff;
-            int j;
-            for (j = 0; j < len; j++) {
-                if (hl[j] == HL_NONPRINT) {
-                    char sym;
-                    abAppend(&ab,"\x1b[7m",4);
-                    if (c[j] <= 26)
-                        sym = '@'+c[j];
-                    else
-                        sym = '?';
-                    abAppend(&ab,&sym,1);
-                    abAppend(&ab,"\x1b[0m",4);
-                } else if (hl[j] == HL_NORMAL) {
-                    if (current_color != -1) {
-                        abAppend(&ab,"\x1b[39m",5);
-                        current_color = -1;
-                    }
-                    abAppend(&ab,c+j,1);
-                } else {
-                    int color = editorSyntaxToColor(hl[j]);
-                    if (color != current_color) {
-                        char buf[16];
-                        int clen = snprintf(buf,sizeof(buf),"\x1b[%dm",color);
-                        current_color = color;
-                        abAppend(&ab,buf,clen);
-                    }
-                    abAppend(&ab,c+j,1);
-                }
-            }
-        }
-        abAppend(&ab,"\x1b[39m",5);
-        abAppend(&ab,"\x1b[0K",4);
-        abAppend(&ab,"\r\n",2);
+        while (padding--)
+          abAppend(&ab, " ", 1);
+        abAppend(&ab, welcome, welcomelen);
+      } else {
+        abAppend(&ab, "~\x1b[0K\r\n", 7);
+      }
+      continue;
     }
 
-    /* Create a two rows status. First row: */
-    abAppend(&ab,"\x1b[0K",4);
-    abAppend(&ab,"\x1b[7m",4);
-    char status[80], rstatus[80];
-    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
-        E.filename, E.numrows, E.dirty ? "(modified)" : "");
-    int rlen = snprintf(rstatus, sizeof(rstatus),
-        "%d/%d",E.rowoff+E.cy+1,E.numrows);
-    if (len > E.screencols) len = E.screencols;
-    abAppend(&ab,status,len);
-    while(len < E.screencols) {
-        if (E.screencols - len == rlen) {
-            abAppend(&ab,rstatus,rlen);
-            break;
+    r = &E.row[filerow];
+
+    int len = r->rsize - E.coloff;
+    int current_color = -1;
+    if (len > 0) {
+      if (len > E.screencols)
+        len = E.screencols;
+      char *c = r->render + E.coloff;
+      unsigned char *hl = r->hl + E.coloff;
+      int j;
+      for (j = 0; j < len; j++) {
+        if (E.selection_row != -1 &&
+            (E.selection_row == y && E.selection_offset == j) !=
+                (E.cy + E.coloff == y && E.cx + E.rowoff == j)) {
+          if (in_region) {
+            abAppend(&ab, "\x1b[27m", 5);
+            in_region = 0;
+          } else {
+            abAppend(&ab, "\x1b[7m", 4);
+            in_region = 1;
+          }
+        }
+        if (hl[j] == HL_NONPRINT) {
+          char sym;
+          abAppend(&ab, "\x1b[7m", 4);
+          if (c[j] <= 26)
+            sym = '@' + c[j];
+          else
+            sym = '?';
+          abAppend(&ab, &sym, 1);
+          abAppend(&ab, "\x1b[0m", 4);
+        } else if (hl[j] == HL_NORMAL) {
+          if (current_color != -1) {
+            abAppend(&ab, "\x1b[39m", 5);
+            current_color = -1;
+          }
+          abAppend(&ab, c + j, 1);
         } else {
-            abAppend(&ab," ",1);
-            len++;
+          int color = editorSyntaxToColor(hl[j]);
+          if (color != current_color) {
+            char buf[16];
+            int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
+            current_color = color;
+            abAppend(&ab, buf, clen);
+          }
+          abAppend(&ab, c + j, 1);
         }
+      }
     }
-    abAppend(&ab,"\x1b[0m\r\n",6);
+    abAppend(&ab, "\x1b[39m", 5);
+    abAppend(&ab, "\x1b[0K", 4);
+    abAppend(&ab, "\r\n", 2);
+  }
 
-    /* Second row depends on E.statusmsg and the status message update time. */
-    abAppend(&ab,"\x1b[0K",4);
-    int msglen = strlen(E.statusmsg);
-    if (msglen && time(NULL)-E.statusmsg_time < 5)
-        abAppend(&ab,E.statusmsg,msglen <= E.screencols ? msglen : E.screencols);
-
-    /* Put cursor at its current position. Note that the horizontal position
-     * at which the cursor is displayed may be different compared to 'E.cx'
-     * because of TABs. */
-    int j;
-    int cx = 1;
-    int filerow = E.rowoff+E.cy;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
-    if (row) {
-        for (j = E.coloff; j < (E.cx+E.coloff); j++) {
-            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
-            cx++;
-        }
+  /* Create a two rows status. First row: */
+  abAppend(&ab, "\x1b[0K", 4);
+  abAppend(&ab, "\x1b[7m", 4);
+  char status[80], rstatus[80];
+  int len = snprintf(status, sizeof(status), "%.20s - %d lines %s", E.filename,
+                     E.numrows, E.dirty ? "(modified)" : "");
+  int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.rowoff + E.cy + 1,
+                      E.numrows);
+  if (len > E.screencols)
+    len = E.screencols;
+  abAppend(&ab, status, len);
+  while (len < E.screencols) {
+    if (E.screencols - len == rlen) {
+      abAppend(&ab, rstatus, rlen);
+      break;
+    } else {
+      abAppend(&ab, " ", 1);
+      len++;
     }
-    snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,cx);
-    abAppend(&ab,buf,strlen(buf));
-    abAppend(&ab,"\x1b[?25h",6); /* Show cursor. */
-    write(STDOUT_FILENO,ab.b,ab.len);
-    abFree(&ab);
+  }
+  abAppend(&ab, "\x1b[0m\r\n", 6);
+
+  /* Second row depends on E.statusmsg and the status message update time. */
+  abAppend(&ab, "\x1b[0K", 4);
+  int msglen = strlen(E.statusmsg);
+  if (msglen && time(NULL) - E.statusmsg_time < 5)
+    abAppend(&ab, E.statusmsg, msglen <= E.screencols ? msglen : E.screencols);
+
+  /* Put cursor at its current position. Note that the horizontal position
+   * at which the cursor is displayed may be different compared to 'E.cx'
+   * because of TABs. */
+  int j;
+  int cx = 1;
+  int filerow = E.rowoff + E.cy;
+  erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+  if (row) {
+    for (j = E.coloff; j < (E.cx + E.coloff); j++) {
+      if (j < row->size && row->chars[j] == TAB)
+        cx += 7 - ((cx) % 8);
+      cx++;
+    }
+  }
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, cx);
+  abAppend(&ab, buf, strlen(buf));
+  abAppend(&ab, "\x1b[?25h", 6); /* Show cursor. */
+  write(STDOUT_FILENO, ab.b, ab.len);
+  abFree(&ab);
 }
 
 /* Set an editor status message for the second line of the status, at the
@@ -936,11 +992,12 @@ void initEditor(void) {
     E.dirty = 0;
     E.filename = NULL;
     E.syntax = NULL;
-    if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
-                      &E.screenrows,&E.screencols) == -1)
-    {
-        perror("Unable to query the screen for size (columns / rows)");
-        exit(1);
+    E.selection_row = -1;
+    E.selection_offset = 0;
+    if (getWindowSize(STDIN_FILENO, STDOUT_FILENO, &E.screenrows,
+                      &E.screencols) == -1) {
+      perror("Unable to query the screen for size (columns / rows)");
+      exit(1);
     }
     E.screenrows -= 2; /* Get room for status bar. */
 }

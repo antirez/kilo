@@ -15,7 +15,7 @@ void editorProcessKeypress(int fd) {
 
   int c = editorReadKey(fd);
 
-  if (mode == VM_NORMAL) {
+  if (mode == VM_NORMAL || mode == VM_VISUAL_CHAR || mode == VM_VISUAL_LINE) {
     switch (c) {
     case ENTER: /* Enter */
       editorMoveCursor(DOWN);
@@ -32,13 +32,13 @@ void editorProcessKeypress(int fd) {
       break;
     case ':': {
       char *fn = editorReadStringFromStatusBar(":");
-      if (fn)
-        handleColonFunction(fn);
+      if (fn && handleColonFunction(fn))
+        editorSetStatusMessage("function '%s' not found", fn);
       break;
     }
     case BACKSPACE: /* Backspace */
     case DEL_KEY:
-      editorDelChar();
+      editorMoveCursor(LEFT);
       break;
     case PAGE_UP:
     case PAGE_DOWN:
@@ -74,12 +74,12 @@ void editorProcessKeypress(int fd) {
     case 'o':
       editorInsertRow(E.cy + E.rowoff + 1, "", 0);
       editorMoveCursor(DOWN);
-        mode = VM_INSERT;
-        break;
+      mode = VM_INSERT;
+      break;
     case 'O':
-        editorInsertRow(E.cy + E.rowoff, "", 0);
-        mode = VM_INSERT;
-        break;
+      editorInsertRow(E.cy + E.rowoff, "", 0);
+      mode = VM_INSERT;
+      break;
     case 'A':
       editorMoveCursorToRowEnd();
       mode = VM_INSERT;
@@ -98,11 +98,58 @@ void editorProcessKeypress(int fd) {
     case 'x':
       editorDelChar();
       break;
+    case 'v':
+      if (mode == VM_VISUAL_CHAR) {
+        mode = VM_NORMAL;
+        E.selection_row = -1;
+        E.selection_offset = 0;
+        editorSetStatusMessage("INSERT");
+        break;
+      }
+      if (mode == VM_NORMAL) {
+        E.selection_row = E.rowoff + E.cy;
+        E.selection_offset = E.coloff + E.cx;
+      }
+      mode = VM_VISUAL_CHAR;
+      editorSetStatusMessage("VISUAL CHAR");
+      break;
+    case 'V':
+      if (mode == VM_VISUAL_LINE) {
+        mode = VM_NORMAL;
+        E.selection_row = -1;
+        E.selection_offset = 0;
+        editorSetStatusMessage("INSERT");
+        break;
+      }
+      if (mode == VM_NORMAL) {
+        E.selection_row = E.rowoff + E.cy;
+        E.selection_offset = 0;
+      }
+      mode = VM_VISUAL_LINE;
+      editorSetStatusMessage("VISUAL LINE");
+      break;
+    case 'd':
+      if (mode != VM_NORMAL) {
+        if (mode == VM_VISUAL_CHAR)
+          editorDeleteSelection(E.selection_row, E.selection_offset,
+                                E.cy + E.rowoff, E.cx + E.coloff);
+        else if (mode == VM_VISUAL_LINE)
+          editorDeleteRows(E.selection_row, E.cy + E.rowoff);
+        mode = VM_NORMAL;
+        E.selection_row = -1;
+        E.selection_offset = 0;
+        editorSetStatusMessage("NORMAL");
+        break;
+      }
+      break;
     case CTRL_L: /* ctrl+l, clear screen */
       /* Just refresh the line as side effect. */
       break;
     case ESC:
-      /* Nothing to do for ESC in this mode. */
+      if (mode != VM_NORMAL) {
+        E.selection_row = -1;
+        E.selection_offset = 0;
+      }
       break;
     default:
       /* Unhandled input, ignore. */
@@ -130,7 +177,5 @@ void editorProcessKeypress(int fd) {
     default:
       editorInsertChar(c);
     }
-  } else if (mode == VM_SELECTION) {
-    // FIXME
   }
 }

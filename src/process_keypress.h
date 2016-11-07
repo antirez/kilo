@@ -3,8 +3,9 @@
 
 enum vimMode {
   VM_NORMAL,
+  VM_VISUAL_CHAR,
+  VM_VISUAL_LINE,
   VM_INSERT,
-  VM_SELECTION,
 };
 
 void editorProcessKeypress(int fd);
