@@ -2,12 +2,68 @@
 #include "colon.h"
 #include "function.h"
 #include "kilo.h"
+#include <unistd.h>
 
 #define ENTER_MODE(NAME)                                                       \
   do {                                                                         \
     E.mode = VM_##NAME;                                                        \
     editorSetStatusMessage(#NAME);                                             \
   } while (0)
+
+static textObject editorParseTextObjectOverride(char override) {
+  if (E.selection_row != -1)
+    return editorRegionObject();
+
+  int c = override ? override : editorReadKey(STDIN_FILENO);
+
+  bool isInner = false;
+  switch (c) {
+  case 'i':
+    isInner = true;
+    c = editorReadKey(STDIN_FILENO);
+    break;
+  }
+
+  textObject obj;
+
+  switch (c) {
+  case 'w':
+    obj = editorWordAtPoint(cursorX(), cursorY(),
+                            isInner ? TOK_INNER : TOK_RIGHT);
+    break;
+  case 'b':
+    obj =
+        editorWordAtPoint(cursorX(), cursorY(), isInner ? TOK_INNER : TOK_LEFT);
+    break;
+  case '%':
+    obj = editorComplementTextObject(cursorX(), cursorY());
+    break;
+  case '(':
+  case ')':
+    return editorPairAtPoint(cursorX(), cursorY(), '(', ')', isInner);
+  case '{':
+  case '}':
+    return editorPairAtPoint(cursorX(), cursorY(), '{', '}', isInner);
+  case '<':
+  case '>':
+    return editorPairAtPoint(cursorX(), cursorY(), '<', '>', isInner);
+  case '[':
+  case ']':
+    return editorPairAtPoint(cursorX(), cursorY(), '[', ']', isInner);
+  case '"':
+  case '\'':
+    return editorPairAtPoint(cursorX(), cursorY(), c, c, isInner);
+
+  default:
+    return EMPTY_TEXT_OBJECT;
+  }
+
+  return obj;
+}
+
+static textObject editorParseTextObject() {
+  return editorParseTextObjectOverride('\0');
+}
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
@@ -121,19 +177,32 @@ void editorProcessKeypress(int fd) {
       }
       ENTER_MODE(VISUAL_LINE);
       break;
-    case 'd':
-      if (E.mode != VM_NORMAL) {
-        if (E.mode == VM_VISUAL_CHAR)
-          editorDeleteSelection(E.selection_row, E.selection_offset,
-                                E.cy + E.rowoff, E.cx + E.coloff);
-        else if (E.mode == VM_VISUAL_LINE)
-          editorDeleteRows(E.selection_row, E.cy + E.rowoff);
-        ENTER_MODE(NORMAL);
-        E.selection_row = -1;
-        E.selection_offset = 0;
+    case 'd': {
+      textObject obj = editorParseTextObject();
+      if (!badTextObject(obj))
+        editorDeleteTextObject(obj);
+
+      E.selection_row = -1;
+      E.selection_offset = 0;
+      ENTER_MODE(NORMAL);
+      break;
+    }
+    case 'w':
+    case 'b':
+    case '%': {
+      textObject obj = editorParseTextObjectOverride(c);
+      if (badTextObject(obj))
         break;
+
+      if (obj.firstX == cursorX() && obj.firstY == cursorY()) {
+        E.cx = obj.secondX - E.rowoff;
+        E.cy = obj.secondY - E.coloff;
+      } else {
+        E.cx = obj.firstX - E.rowoff;
+        E.cy = obj.firstY - E.coloff;
       }
       break;
+    }
     case CTRL_L: /* ctrl+l, clear screen */
       /* Just refresh the line as side effect. */
       break;

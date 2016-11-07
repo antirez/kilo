@@ -248,6 +248,192 @@ void editorSelectSyntaxHighlight(char *filename) {
     }
 }
 
+/* ======================= Text Object helpers ============================== */
+
+textObject editorWordAtPoint(int x, int y, textObjectKind kind) {
+  charIterator *forward = &(charIterator){x, y};
+  charIterator *backward = &(charIterator){x, y};
+
+  if (kind == TOK_INNER || kind == TOK_LEFT) {
+    while (loadChar(backward) && loadChar(backward) == ' ')
+      decrementChar(backward);
+    while (loadChar(backward) && loadChar(backward) != ' ')
+      decrementChar(backward);
+  }
+
+  if (kind == TOK_RIGHT) {
+    while (loadChar(forward) && loadChar(forward) == ' ')
+      incrementChar(forward);
+    while (loadChar(forward) && loadChar(forward) != ' ')
+      incrementChar(forward);
+  }
+
+  return (textObject){backward->x, backward->y, forward->x, forward->y};
+}
+
+static char complementOf(char c) {
+  switch (c) {
+  case '(': return ')';
+  case '{': return '}';
+  case '<': return '>';
+  case '[': return ']';
+  case ')': return '(';
+  case '}': return '{';
+  case '>': return '<';
+  case ']': return '[';
+  }
+  return '\0';
+}
+
+static bool findNearestComplementableChar(charIterator *forward) {
+  charIterator *backward = &(charIterator){forward->x, forward->y};
+
+  for (;;) {
+    char forcomp = complementOf(loadChar(forward));
+    if (forcomp && forcomp < loadChar(forward))
+      break;
+    char backcomp = complementOf(loadChar(backward));
+    if (backcomp && backcomp > loadChar(backward))
+      break;
+
+    /* We've reached EOF. */
+    if (!loadChar(forward) || !loadChar(backward))
+      return true;
+    incrementChar(forward);
+    decrementChar(backward);
+  }
+
+  if (complementOf(loadChar(forward)) == '\0') {
+    forward->x = backward->x;
+    forward->y = backward->y;
+  }
+
+  return false;
+}
+
+textObject editorComplementTextObject(int x, int y) {
+  charIterator *iter = &(charIterator){x, y};
+  char point = loadChar(iter);
+  char complement = complementOf(point);
+  bool goRight = point < complement;
+
+  if (!complement) {
+    if (findNearestComplementableChar(iter))
+      return EMPTY_TEXT_OBJECT;
+    point = loadChar(iter);
+    complement = complementOf(point);
+    goRight = point < complement;
+  }
+
+  void (*increment)(charIterator * it) =
+      goRight ? incrementChar : decrementChar;
+
+  for (;;) {
+    char c = loadChar(iter);
+    if (c == '\0')
+      return EMPTY_TEXT_OBJECT;
+    if (c == complement)
+      break;
+    increment(iter);
+  }
+
+  return goRight ? (textObject){x, y, iter->x, iter->y}
+                 : (textObject){iter->x, iter->y, x, y};
+}
+
+/* Balanced region selector. */
+textObject editorPairAtPoint(int x, int y, char lhs, char rhs, bool isInner) {
+  charIterator *backwards = &(charIterator){x, y};
+  charIterator *forwards = &(charIterator){x, y};
+
+  if (loadChar(backwards) == '\0')
+    return EMPTY_TEXT_OBJECT;
+
+  int parenCount = 0;
+  if (isInner) {
+    for (;;) {
+      char c = loadChar(backwards);
+      if (c == '\0')
+        return EMPTY_TEXT_OBJECT;
+      if (c == rhs)
+        ++parenCount;
+      if (c == lhs)
+       if (!parenCount--)
+          break;
+      decrementChar(backwards);
+    }
+  }
+
+  parenCount = 0;
+  for (;;) {
+    char c = loadChar(forwards);
+    if (c == '\0')
+      return EMPTY_TEXT_OBJECT;
+    if (c == lhs)
+      ++parenCount;
+    if (c == rhs)
+      if (parenCount-- == 0)
+        break;
+    incrementChar(forwards);
+  }
+
+  return (textObject){backwards->x + 1, backwards->y, forwards->x - 1,
+                      forwards->y};
+}
+
+textObject editorRegionObject() {
+  if (cursorY() < regionY() ||
+      (cursorY() == regionY() && cursorX() < regionX()))
+    return (textObject){cursorX(), cursorY(), regionX(), regionY()};
+  else
+    return (textObject){regionX(), regionY(), cursorX(), cursorY()};
+}
+
+static bool editorDeleteRows(textObject obj) {
+  if (badTextObject(obj))
+    return true;
+
+  int iter = obj.secondY - obj.firstY + 1;
+  while (iter--)
+    editorDelRow(obj.firstY);
+
+  E.cx = obj.firstX - E.rowoff;
+  E.cy = obj.firstY - E.coloff;
+
+  return false;
+}
+
+static bool editorDeleteSelection(textObject obj) {
+  if (badTextObject(obj))
+    return true;
+
+  char *begin, *end;
+
+  /* Join the begin of begin_row and the end of end_row together */
+  begin = strndup(E.row[obj.firstY].chars, obj.firstX);
+  end = strdup(E.row[obj.secondY].chars + obj.secondX + 1);
+  int size = strlen(begin) + strlen(end);
+
+  begin = realloc(begin, size + 1);
+  strcat(begin, end);
+
+  editorDeleteRows(obj);
+  editorInsertRow(obj.firstY, begin, size);
+
+  free(end);
+  free(begin);
+
+  E.cx = obj.firstX - E.coloff;
+  E.cy = obj.firstY - E.rowoff;
+  return false;
+}
+
+bool editorDeleteTextObject(textObject obj) {
+  if (E.mode == VM_VISUAL_LINE)
+    return editorDeleteRows(obj);
+  return editorDeleteSelection(obj);
+}
+
 /* ======================= Editor rows implementation ======================= */
 
 /* Update the rendered version and the syntax highlight of a row. */
@@ -318,45 +504,6 @@ void editorDelRow(int at) {
     for (int j = at; j < E.numrows-1; j++) E.row[j].idx++;
     E.numrows--;
     E.dirty++;
-}
-
-void editorDeleteRows(int begin_row, int end_row) {
-  if (begin_row > end_row)
-    SWAP(begin_row, end_row);
-
-  int iter = end_row - begin_row + 1;
-  while (iter--)
-    editorDelRow(begin_row);
-}
-
-void editorDeleteSelection(int begin_row, int begin_col, int end_row,
-                           int end_col) {
-  if (begin_col > E.row[begin_row].size || end_col > E.row[end_row].size)
-    return;
-
-  char *begin, *end;
-
-  if (begin_row > end_row || (begin_row == end_row && begin_col > end_col)) {
-    begin = strndup(E.row[end_row].chars, end_col);
-    end = strdup(E.row[begin_row].chars + begin_col + 1);
-  } else {
-    /* Join the begin of begin_row and the end of end_row together */
-    begin = strndup(E.row[begin_row].chars, begin_col);
-    end = strdup(E.row[end_row].chars + end_col + 1);
-  }
-
-  int size = strlen(begin) + strlen(end);
-
-  begin = realloc(begin, size + 1);
-  strcat(begin, end);
-
-  editorDeleteRows(begin_row, end_row);
-  editorInsertRow(begin_row < end_row ? begin_row : end_row, begin, size);
-
-  free(end);
-  free(begin);
-
-  E.cx = begin_col < end_col ? begin_col : end_col;
 }
 
 /* Turn the editor rows into a single heap-allocated string.
