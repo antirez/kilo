@@ -58,7 +58,8 @@
 #include "syntax_highlighter.h"
 #include "colon.h"
 
-struct editorConfig E;
+struct ptrVector openBuffers;
+struct bufferConfig *buffer;
 
 FILE *logfile;
 
@@ -70,9 +71,9 @@ static struct termios orig_termios; /* In order to restore at exit.*/
 
 void disableRawMode(int fd) {
     /* Don't even check the return value as it's too late. */
-    if (E.rawmode) {
+    if (buffer->rawmode) {
         tcsetattr(fd,TCSAFLUSH,&orig_termios);
-        E.rawmode = 0;
+        buffer->rawmode = 0;
     }
 }
 
@@ -85,7 +86,7 @@ void editorAtExit(void) {
 int enableRawMode(int fd) {
     struct termios raw;
 
-    if (E.rawmode) return 0; /* Already enabled. */
+    if (buffer->rawmode) return 0; /* Already enabled. */
     if (!isatty(STDIN_FILENO)) goto fatal;
     atexit(editorAtExit);
     if (tcgetattr(fd,&orig_termios) == -1) goto fatal;
@@ -107,7 +108,7 @@ int enableRawMode(int fd) {
 
     /* put terminal in raw mode after flushing */
     if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
-    E.rawmode = 1;
+    buffer->rawmode = 1;
     return 0;
 
 fatal:
@@ -239,7 +240,7 @@ void editorSelectSyntaxHighlight(char *filename) {
             int patlen = strlen(s->filematch[i]);
             if ((p = strstr(filename,s->filematch[i])) != NULL) {
                 if (s->filematch[i][0] != '.' || p[patlen] == '\0') {
-                    E.syntax = s;
+                    buffer->syntax = s;
                     return;
                 }
             }
@@ -397,8 +398,8 @@ static bool editorDeleteRows(textObject obj) {
   while (iter--)
     editorDelRow(obj.firstY);
 
-  E.cx = obj.firstX - E.rowoff;
-  E.cy = obj.firstY - E.coloff;
+  buffer->cx = obj.firstX - buffer->rowoff;
+  buffer->cy = obj.firstY - buffer->coloff;
 
   return false;
 }
@@ -410,8 +411,8 @@ static bool editorDeleteSelection(textObject obj) {
   char *begin, *end;
 
   /* Join the begin of begin_row and the end of end_row together */
-  begin = strndup(E.row[obj.firstY].chars, obj.firstX);
-  end = strdup(E.row[obj.secondY].chars + obj.secondX + 1);
+  begin = strndup(buffer->row[obj.firstY].chars, obj.firstX);
+  end = strdup(buffer->row[obj.secondY].chars + obj.secondX + 1);
   int size = strlen(begin) + strlen(end);
 
   begin = realloc(begin, size + 1);
@@ -423,13 +424,13 @@ static bool editorDeleteSelection(textObject obj) {
   free(end);
   free(begin);
 
-  E.cx = obj.firstX - E.coloff;
-  E.cy = obj.firstY - E.rowoff;
+  buffer->cx = obj.firstX - buffer->coloff;
+  buffer->cy = obj.firstY - buffer->rowoff;
   return false;
 }
 
 bool editorDeleteTextObject(textObject obj) {
-  if (E.mode == VM_VISUAL_LINE)
+  if (buffer->mode == VM_VISUAL_LINE)
     return editorDeleteRows(obj);
   return editorDeleteSelection(obj);
 }
@@ -466,23 +467,23 @@ void editorUpdateRow(erow *row) {
 /* Insert a row at the specified position, shifting the other rows on the bottom
  * if required. */
 void editorInsertRow(int at, char *s, size_t len) {
-    if (at > E.numrows) return;
-    E.row = realloc(E.row,sizeof(erow)*(E.numrows+1));
-    if (at != E.numrows) {
-        memmove(E.row+at+1,E.row+at,sizeof(E.row[0])*(E.numrows-at));
-        for (int j = at+1; j <= E.numrows; j++) E.row[j].idx++;
+    if (at > buffer->numrows) return;
+    buffer->row = realloc(buffer->row,sizeof(erow)*(buffer->numrows+1));
+    if (at != buffer->numrows) {
+        memmove(buffer->row+at+1,buffer->row+at,sizeof(buffer->row[0])*(buffer->numrows-at));
+        for (int j = at+1; j <= buffer->numrows; j++) buffer->row[j].idx++;
     }
-    E.row[at].size = len;
-    E.row[at].chars = malloc(len+1);
-    memcpy(E.row[at].chars,s,len+1);
-    E.row[at].hl = NULL;
-    E.row[at].hl_oc = 0;
-    E.row[at].render = NULL;
-    E.row[at].rsize = 0;
-    E.row[at].idx = at;
-    editorUpdateRow(E.row+at);
-    E.numrows++;
-    E.dirty++;
+    buffer->row[at].size = len;
+    buffer->row[at].chars = malloc(len+1);
+    memcpy(buffer->row[at].chars,s,len+1);
+    buffer->row[at].hl = NULL;
+    buffer->row[at].hl_oc = 0;
+    buffer->row[at].render = NULL;
+    buffer->row[at].rsize = 0;
+    buffer->row[at].idx = at;
+    editorUpdateRow(buffer->row+at);
+    buffer->numrows++;
+    buffer->dirty++;
 }
 
 /* Free row's heap allocated stuff. */
@@ -497,13 +498,13 @@ void editorFreeRow(erow *row) {
 void editorDelRow(int at) {
     erow *row;
 
-    if(at >= E.numrows) return;
-    row = E.row+at;
+    if(at >= buffer->numrows) return;
+    row = buffer->row+at;
     editorFreeRow(row);
-    memmove(E.row+at,E.row+at+1,sizeof(E.row[0])*(E.numrows-at-1));
-    for (int j = at; j < E.numrows-1; j++) E.row[j].idx++;
-    E.numrows--;
-    E.dirty++;
+    memmove(buffer->row+at,buffer->row+at+1,sizeof(buffer->row[0])*(buffer->numrows-at-1));
+    for (int j = at; j < buffer->numrows-1; j++) buffer->row[j].idx++;
+    buffer->numrows--;
+    buffer->dirty++;
 }
 
 /* Turn the editor rows into a single heap-allocated string.
@@ -516,15 +517,15 @@ char *editorRowsToString(int *buflen) {
     int j;
 
     /* Compute count of bytes */
-    for (j = 0; j < E.numrows; j++)
-        totlen += E.row[j].size+1; /* +1 is for "\n" at end of every row */
+    for (j = 0; j < buffer->numrows; j++)
+        totlen += buffer->row[j].size+1; /* +1 is for "\n" at end of every row */
     *buflen = totlen;
     totlen++; /* Also make space for nulterm */
 
     p = buf = malloc(totlen);
-    for (j = 0; j < E.numrows; j++) {
-        memcpy(p,E.row[j].chars,E.row[j].size);
-        p += E.row[j].size;
+    for (j = 0; j < buffer->numrows; j++) {
+        memcpy(p,buffer->row[j].chars,buffer->row[j].size);
+        p += buffer->row[j].size;
         *p = '\n';
         p++;
     }
@@ -553,7 +554,7 @@ void editorRowInsertChar(erow *row, int at, int c) {
     }
     row->chars[at] = c;
     editorUpdateRow(row);
-    E.dirty++;
+    buffer->dirty++;
 }
 
 /* Append the string 's' at the end of a row */
@@ -563,7 +564,7 @@ void editorRowAppendString(erow *row, char *s, size_t len) {
     row->size += len;
     row->chars[row->size] = '\0';
     editorUpdateRow(row);
-    E.dirty++;
+    buffer->dirty++;
 }
 
 /* Delete the character at offset 'at' from the specified row. */
@@ -572,39 +573,39 @@ void editorRowDelChar(erow *row, int at) {
     memmove(row->chars+at,row->chars+at+1,row->size-at);
     editorUpdateRow(row);
     row->size--;
-    E.dirty++;
+    buffer->dirty++;
 }
 
 /* Insert the specified char at the current prompt position. */
 void editorInsertChar(int c) {
-    int filerow = E.rowoff+E.cy;
-    int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    int filerow = buffer->rowoff+buffer->cy;
+    int filecol = buffer->coloff+buffer->cx;
+    erow *row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
 
     /* If the row where the cursor is currently located does not exist in our
      * logical representaion of the file, add enough empty rows as needed. */
     if (!row) {
-        while(E.numrows <= filerow)
-            editorInsertRow(E.numrows,"",0);
+        while(buffer->numrows <= filerow)
+            editorInsertRow(buffer->numrows,"",0);
     }
-    row = &E.row[filerow];
+    row = &buffer->row[filerow];
     editorRowInsertChar(row,filecol,c);
-    if (E.cx == E.screencols-1)
-        E.coloff++;
+    if (buffer->cx == buffer->screencols-1)
+        buffer->coloff++;
     else
-        E.cx++;
-    E.dirty++;
+        buffer->cx++;
+    buffer->dirty++;
 }
 
 /* Inserting a newline is slightly complex as we have to handle inserting a
  * newline in the middle of a line, splitting the line as needed. */
 void editorInsertNewline(void) {
-    int filerow = E.rowoff+E.cy;
-    int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    int filerow = buffer->rowoff+buffer->cy;
+    int filecol = buffer->coloff+buffer->cx;
+    erow *row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
 
     if (!row) {
-        if (filerow == E.numrows) {
+        if (filerow == buffer->numrows) {
             editorInsertRow(filerow,"",0);
             goto fixcursor;
         }
@@ -618,54 +619,54 @@ void editorInsertNewline(void) {
     } else {
         /* We are in the middle of a line. Split it between two rows. */
         editorInsertRow(filerow+1,row->chars+filecol,row->size-filecol);
-        row = &E.row[filerow];
+        row = &buffer->row[filerow];
         row->chars[filecol] = '\0';
         row->size = filecol;
         editorUpdateRow(row);
     }
 fixcursor:
-    if (E.cy == E.screenrows-1) {
-        E.rowoff++;
+    if (buffer->cy == buffer->screenrows-1) {
+        buffer->rowoff++;
     } else {
-        E.cy++;
+        buffer->cy++;
     }
-    E.cx = 0;
-    E.coloff = 0;
+    buffer->cx = 0;
+    buffer->coloff = 0;
 }
 
 /* Delete the char at the current prompt position. */
 void editorDelChar() {
-    int filerow = E.rowoff+E.cy;
-    int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    int filerow = buffer->rowoff+buffer->cy;
+    int filecol = buffer->coloff+buffer->cx;
+    erow *row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
 
     if (!row || (filecol == 0 && filerow == 0)) return;
     if (filecol == 0) {
         /* Handle the case of column 0, we need to move the current line
          * on the right of the previous one. */
-        filecol = E.row[filerow-1].size;
-        editorRowAppendString(&E.row[filerow-1],row->chars,row->size);
+        filecol = buffer->row[filerow-1].size;
+        editorRowAppendString(&buffer->row[filerow-1],row->chars,row->size);
         editorDelRow(filerow);
         row = NULL;
-        if (E.cy == 0)
-            E.rowoff--;
+        if (buffer->cy == 0)
+            buffer->rowoff--;
         else
-            E.cy--;
-        E.cx = filecol;
-        if (E.cx >= E.screencols) {
-            int shift = (E.screencols-E.cx)+1;
-            E.cx -= shift;
-            E.coloff += shift;
+            buffer->cy--;
+        buffer->cx = filecol;
+        if (buffer->cx >= buffer->screencols) {
+            int shift = (buffer->screencols-buffer->cx)+1;
+            buffer->cx -= shift;
+            buffer->coloff += shift;
         }
     } else {
         editorRowDelChar(row,filecol-1);
-        if (E.cx == 0 && E.coloff)
-            E.coloff--;
+        if (buffer->cx == 0 && buffer->coloff)
+            buffer->coloff--;
         else
-            E.cx--;
+            buffer->cx--;
     }
     if (row) editorUpdateRow(row);
-    E.dirty++;
+    buffer->dirty++;
 }
 
 /* Load the specified program in the editor memory and returns 0 on success
@@ -673,30 +674,50 @@ void editorDelChar() {
 int editorOpen(char *filename) {
     FILE *fp;
 
-    E.dirty = 0;
-    free(E.filename);
-    E.filename = strdup(filename);
+    /* If we already have this buffer open, then switch to it. */
+    bufferConfig *config;
+    if ((config = editorFindBuffer(filename))) {
+      buffer = config;
+      return 0;
+    }
+
+    buffer = calloc(1, sizeof(bufferConfig));
+    buffer->selection_row = -1;
+    if (getWindowSize(STDIN_FILENO, STDOUT_FILENO, &buffer->screenrows,
+                      &buffer->screencols) == -1) {
+      perror("Unable to query the screen for size (columns / rows)");
+      exit(1);
+    }
+    buffer->screenrows -= 2; /* Get room for status bar. */
+
+    ptrVectorPushBack(&openBuffers, buffer);
+
+    buffer->dirty = 0;
+    free(buffer->filename);
+    buffer->filename = strdup(filename);
 
     fp = fopen(filename,"r");
     if (!fp) {
-        if (errno != ENOENT) {
-            perror("Opening file");
-            exit(1);
-        }
-        return 1;
+      if (errno != ENOENT) {
+        perror("Opening file");
+        exit(1);
+      }
+      return 1;
     }
+
+    editorSelectSyntaxHighlight(filename);
 
     char *line = NULL;
     size_t linecap = 0;
     ssize_t linelen;
-    while((linelen = getline(&line,&linecap,fp)) != -1) {
-        if (linelen && (line[linelen-1] == '\n' || line[linelen-1] == '\r'))
-            line[--linelen] = '\0';
-        editorInsertRow(E.numrows,line,linelen);
+    while ((linelen = getline(&line, &linecap, fp)) != -1) {
+      if (linelen && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r'))
+        line[--linelen] = '\0';
+      editorInsertRow(buffer->numrows, line, linelen);
     }
     free(line);
     fclose(fp);
-    E.dirty = 0;
+    buffer->dirty = 0;
     return 0;
 }
 
@@ -704,7 +725,7 @@ int editorOpen(char *filename) {
 int editorSave() {
     int len;
     char *buf = editorRowsToString(&len);
-    int fd = open(E.filename,O_RDWR|O_CREAT,0644);
+    int fd = open(buffer->filename,O_RDWR|O_CREAT,0644);
     if (fd == -1) goto writeerr;
 
     /* Use truncate + a single write(2) call in order to make saving
@@ -714,7 +735,7 @@ int editorSave() {
 
     close(fd);
     free(buf);
-    E.dirty = 0;
+    buffer->dirty = 0;
     editorSetStatusMessage("%d bytes written on disk", len);
     return 0;
 
@@ -726,7 +747,7 @@ writeerr:
 }
 
 void editorQuit(int force) {
-  if (E.dirty && !force) {
+  if (buffer->dirty && !force) {
     editorSetStatusMessage("WARNING!!! File has unsaved changes."
                            "Do you want to continue? (y/n)");
     editorRefreshScreen();
@@ -769,7 +790,7 @@ static inline void abAppend(struct abuf *ab, const char *s) {
 static void abFree(struct abuf *ab) { free(ab->b); }
 
 bool editorIsPointInRegion(int x, int y) {
-  switch (E.mode) {
+  switch (buffer->mode) {
   case VM_VISUAL_CHAR:
     if (y != cursorY() && y != regionY())
       return clamp(cursorY(), regionY(), y);
@@ -806,16 +827,16 @@ void editorRefreshScreen(void) {
 
   abAppend(&ab, "\x1b[?25l"); /* Hide cursor. */
   abAppend(&ab, "\x1b[H");    /* Go home. */
-  for (y = 0; y < E.screenrows; y++) {
-    int filerow = E.rowoff + y;
+  for (y = 0; y < buffer->screenrows; y++) {
+    int filerow = buffer->rowoff + y;
 
-    if (filerow >= E.numrows) {
-      if (E.numrows == 0 && y == E.screenrows / 3) {
+    if (filerow >= buffer->numrows) {
+      if (buffer->numrows == 0 && y == buffer->screenrows / 3) {
         char welcome[80];
         int welcomelen =
             snprintf(welcome, sizeof(welcome),
                      "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
-        int padding = (E.screencols - welcomelen) / 2;
+        int padding = (buffer->screencols - welcomelen) / 2;
         if (padding) {
           abAppend(&ab, "~");
           padding--;
@@ -829,19 +850,19 @@ void editorRefreshScreen(void) {
       continue;
     }
 
-    r = &E.row[filerow];
+    r = &buffer->row[filerow];
 
-    int len = r->rsize - E.coloff;
+    int len = r->rsize - buffer->coloff;
     int current_color = -1;
     if (len > 0) {
-      if (len > E.screencols)
-        len = E.screencols;
-      char *c = r->render + E.coloff;
-      unsigned char *hl = r->hl + E.coloff;
+      if (len > buffer->screencols)
+        len = buffer->screencols;
+      char *c = r->render + buffer->coloff;
+      unsigned char *hl = r->hl + buffer->coloff;
       int j;
       for (j = 0; j < len; j++) {
-        if (E.selection_row != -1 &&
-            inRegion != editorIsPointInRegion(E.coloff + j, E.rowoff + y)) {
+        if (buffer->selection_row != -1 &&
+            inRegion != editorIsPointInRegion(buffer->coloff + j, buffer->rowoff + y)) {
           if (inRegion)
             abAppend(&ab, T_INVERSE_END);
           else
@@ -885,15 +906,15 @@ void editorRefreshScreen(void) {
   abAppend(&ab, "\x1b[0K");
   abAppend(&ab, "\x1b[7m");
   char status[80], rstatus[80];
-  int len = snprintf(status, sizeof(status), "%.20s - %d lines %s", E.filename,
-                     E.numrows, E.dirty ? "(modified)" : "");
-  int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.rowoff + E.cy + 1,
-                      E.numrows);
-  if (len > E.screencols)
-    len = E.screencols;
+  int len = snprintf(status, sizeof(status), "%.20s - %d lines %s", buffer->filename,
+                     buffer->numrows, buffer->dirty ? "(modified)" : "");
+  int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", buffer->rowoff + buffer->cy + 1,
+                      buffer->numrows);
+  if (len > buffer->screencols)
+    len = buffer->screencols;
   abAppendLen(&ab, status, len);
-  while (len < E.screencols) {
-    if (E.screencols - len == rlen) {
+  while (len < buffer->screencols) {
+    if (buffer->screencols - len == rlen) {
       abAppendLen(&ab, rstatus, rlen);
       break;
     } else {
@@ -903,30 +924,30 @@ void editorRefreshScreen(void) {
   }
   abAppend(&ab, "\x1b[0m\r\n");
 
-  /* Second row depends on E.statusmsg and the status message update time. */
+  /* Second row depends on buffer->statusmsg and the status message update time. */
   abAppend(&ab, "\x1b[0K");
-  int msglen = strlen(E.statusmsg);
-  if (msglen && time(NULL) - E.statusmsg_time < 5)
-    abAppendLen(&ab, E.statusmsg, msglen <= E.screencols ? msglen : E.screencols);
+  int msglen = strlen(buffer->statusmsg);
+  if (msglen && time(NULL) - buffer->statusmsg_time < 5)
+    abAppendLen(&ab, buffer->statusmsg, msglen <= buffer->screencols ? msglen : buffer->screencols);
 
   /* Put cursor at its current position. Note that the horizontal position
-   * at which the cursor is displayed may be different compared to 'E.cx'
+   * at which the cursor is displayed may be different compared to 'buffer->cx'
    * because of TABs. */
   int j;
   int cx = 1;
-  int filerow = E.rowoff + E.cy;
-  erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+  int filerow = buffer->rowoff + buffer->cy;
+  erow *row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
   if (row) {
-    for (j = E.coloff; j < (E.cx + E.coloff); j++) {
+    for (j = buffer->coloff; j < (buffer->cx + buffer->coloff); j++) {
       if (j < row->size && row->chars[j] == TAB)
         cx += 7 - ((cx) % 8);
       cx++;
     }
   } else {
     /* We're in the status bar! */
-    cx += E.cx;
+    cx += buffer->cx;
   }
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, cx);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", buffer->cy + 1, cx);
   abAppendLen(&ab, buf, strlen(buf));
   abAppend(&ab, "\x1b[?25h"); /* Show cursor. */
   write(STDOUT_FILENO, ab.b, ab.len);
@@ -938,19 +959,19 @@ void editorRefreshScreen(void) {
 void editorSetStatusMessage(const char *fmt, ...) {
     va_list ap;
     va_start(ap,fmt);
-    vsnprintf(E.statusmsg,sizeof(E.statusmsg),fmt,ap);
+    vsnprintf(buffer->statusmsg,sizeof(buffer->statusmsg),fmt,ap);
     va_end(ap);
-    E.statusmsg_time = time(NULL);
+    buffer->statusmsg_time = time(NULL);
 }
 
 char *editorReadStringFromStatusBar(char *prefix) {
   int init_offset = strlen(prefix);
   editorSetStatusMessage(prefix);
 
-  int restoreCX = E.cx, restoreCY = E.cy;
+  int restoreCX = buffer->cx, restoreCY = buffer->cy;
 
-  E.cx = init_offset;
-  E.cy = E.screencols - 1;
+  buffer->cx = init_offset;
+  buffer->cy = buffer->screencols - 1;
 
   int inspos = 0;
   int endpos = 0;
@@ -975,21 +996,21 @@ char *editorReadStringFromStatusBar(char *prefix) {
         memmove(str + inspos - 1, str + inspos, endpos - inspos + 1);
         inspos--;
         endpos--;
-        E.cx--;
+        buffer->cx--;
       }
       break;
 
     case ARROW_RIGHT:
       if (inspos < endpos) {
         inspos++;
-        E.cx++;
+        buffer->cx++;
         editorRefreshScreen();
       }
       break;
     case ARROW_LEFT:
       if (inspos) {
         inspos--;
-        E.cx--;
+        buffer->cx--;
         editorRefreshScreen();
       }
       break;
@@ -1025,7 +1046,7 @@ char *editorReadStringFromStatusBar(char *prefix) {
         memmove(str + inspos + 1, str + inspos, endpos - inspos + 1);
         str[inspos++] = c;
         endpos++;
-        E.cx++;
+        buffer->cx++;
       }
     }
   }
@@ -1036,28 +1057,28 @@ fail:
 
 done:
   editorSetStatusMessage("");
-  E.cy = restoreCY;
-  E.cx = restoreCX;
+  buffer->cy = restoreCY;
+  buffer->cx = restoreCX;
   editorRefreshScreen();
   return str;
 }
 
 /* Set the cursor to the absoulute coorodinates x, y */
 bool editorSetCursorPos(int x, int y) {
-  if (y < 0 || y >= E.numrows || x < 0 || x > E.row[y].size)
+  if (y < 0 || y >= buffer->numrows || x < 0 || x > buffer->row[y].size)
     return true;
 
-  E.cy = y - E.rowoff;
-  E.cx = x - E.coloff;
+  buffer->cy = y - buffer->rowoff;
+  buffer->cx = x - buffer->coloff;
 
   /* If we've moved the cursor off the screen, reset it. */
-  while (E.cy >= E.screenrows) {
-    ++E.rowoff;
-    --E.cy;
+  while (buffer->cy >= buffer->screenrows) {
+    ++buffer->rowoff;
+    --buffer->cy;
   }
-  while (E.cy < 0) {
-    --E.rowoff;
-    ++E.cy;
+  while (buffer->cy < 0) {
+    --buffer->rowoff;
+    ++buffer->cy;
   }
 
   return false;
@@ -1074,91 +1095,110 @@ void logmsg(char *fmt, ...) {
   fflush(logfile);
 }
 
+/* ========================= Editor buffer handling  ======================== */
+
+bufferConfig *editorFindBuffer(char *name) {
+  int idx;
+  for (idx = 0; idx < openBuffers.idx; ++idx)
+    if (strcmp(name, ((bufferConfig *)openBuffers.data[idx])->filename) == 0)
+      return openBuffers.data[idx];
+  return NULL;
+}
+
+void editorSwitchBuffer() {
+  char *name = "";
+  bufferConfig *cfg = editorFindBuffer(name);
+  if (!cfg)
+    return;// true;
+  buffer = cfg;
+  return;// false;
+}
+
 /* ========================= Editor events handling  ======================== */
 
 /* Handle cursor position change because arrow keys were pressed. */
 void editorMoveCursor(enum DIRECTION dir) {
-    int filerow = E.rowoff+E.cy;
-    int filecol = E.coloff+E.cx;
+    int filerow = buffer->rowoff+buffer->cy;
+    int filecol = buffer->coloff+buffer->cx;
     int rowlen;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    erow *row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
 
     switch(dir) {
     case LEFT:
-        if (E.cx == 0) {
-            if (E.coloff) {
-                E.coloff--;
+        if (buffer->cx == 0) {
+            if (buffer->coloff) {
+                buffer->coloff--;
             } else {
                 if (filerow > 0) {
-                    E.cy--;
-                    E.cx = E.row[filerow-1].size;
-                    if (E.cx > E.screencols-1) {
-                        E.coloff = E.cx-E.screencols+1;
-                        E.cx = E.screencols-1;
+                    buffer->cy--;
+                    buffer->cx = buffer->row[filerow-1].size;
+                    if (buffer->cx > buffer->screencols-1) {
+                        buffer->coloff = buffer->cx-buffer->screencols+1;
+                        buffer->cx = buffer->screencols-1;
                     }
                 }
             }
         } else {
-            E.cx -= 1;
+            buffer->cx -= 1;
         }
         break;
     case RIGHT:
         if (row && filecol < row->size) {
-            if (E.cx == E.screencols-1) {
-                E.coloff++;
+            if (buffer->cx == buffer->screencols-1) {
+                buffer->coloff++;
             } else {
-                E.cx += 1;
+                buffer->cx += 1;
             }
         } else if (row && filecol == row->size) {
-            E.cx = 0;
-            E.coloff = 0;
-            if (E.cy == E.screenrows-1) {
-                E.rowoff++;
+            buffer->cx = 0;
+            buffer->coloff = 0;
+            if (buffer->cy == buffer->screenrows-1) {
+                buffer->rowoff++;
             } else {
-                E.cy += 1;
+                buffer->cy += 1;
             }
         }
         break;
     case UP:
-        if (E.cy == 0) {
-            if (E.rowoff) E.rowoff--;
+        if (buffer->cy == 0) {
+            if (buffer->rowoff) buffer->rowoff--;
         } else {
-            E.cy -= 1;
+            buffer->cy -= 1;
         }
         break;
     case DOWN:
-        if (filerow < E.numrows) {
-            if (E.cy == E.screenrows-1) {
-                E.rowoff++;
+        if (filerow < buffer->numrows) {
+            if (buffer->cy == buffer->screenrows-1) {
+                buffer->rowoff++;
             } else {
-                E.cy += 1;
+                buffer->cy += 1;
             }
         }
         break;
     }
     /* Fix cx if the current line has not enough chars. */
-    filerow = E.rowoff+E.cy;
-    filecol = E.coloff+E.cx;
-    row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    filerow = buffer->rowoff+buffer->cy;
+    filecol = buffer->coloff+buffer->cx;
+    row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
     rowlen = row ? row->size : 0;
     if (filecol > rowlen) {
-        E.cx -= filecol-rowlen;
-        if (E.cx < 0) {
-            E.coloff += E.cx;
-            E.cx = 0;
+        buffer->cx -= filecol-rowlen;
+        if (buffer->cx < 0) {
+            buffer->coloff += buffer->cx;
+            buffer->cx = 0;
         }
     }
 }
 
 void editorMoveCursorToRowEnd() {
-    int filerow = E.rowoff+E.cy;
-    int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    int filerow = buffer->rowoff+buffer->cy;
+    int filecol = buffer->coloff+buffer->cx;
+    erow *row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
     if (row == NULL) {
         return;
     }
     int rowlen = row ? row->size : 0;
-    int size = rowlen - E.cx-E.coloff;
+    int size = rowlen - buffer->cx-buffer->coloff;
 
     while (size != 0) {
         editorMoveCursor(RIGHT);
@@ -1167,8 +1207,8 @@ void editorMoveCursorToRowEnd() {
 }
 
 bool editorMoveCursorToFirst(char c) {
-  int filerow = E.rowoff+E.cy;
-  erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+  int filerow = buffer->rowoff+buffer->cy;
+  erow *row = (filerow >= buffer->numrows) ? NULL : &buffer->row[filerow];
 
   if (row == NULL) {
     return 0;
@@ -1176,7 +1216,7 @@ bool editorMoveCursorToFirst(char c) {
 
   int size = row->size;
 
-  int i = E.cx+E.coloff;
+  int i = buffer->cx+buffer->coloff;
   int initialOffSet = cursorX();
   bool found = false;
 
@@ -1197,27 +1237,7 @@ bool editorMoveCursorToFirst(char c) {
 }
 
 int editorFileWasModified(void) {
-    return E.dirty;
-}
-
-void initEditor(void) {
-    E.cx = 0;
-    E.cy = 0;
-    E.rowoff = 0;
-    E.coloff = 0;
-    E.numrows = 0;
-    E.row = NULL;
-    E.dirty = 0;
-    E.filename = NULL;
-    E.syntax = NULL;
-    E.selection_row = -1;
-    E.selection_offset = 0;
-    if (getWindowSize(STDIN_FILENO, STDOUT_FILENO, &E.screenrows,
-                      &E.screencols) == -1) {
-      perror("Unable to query the screen for size (columns / rows)");
-      exit(1);
-    }
-    E.screenrows -= 2; /* Get room for status bar. */
+    return buffer->dirty;
 }
 
 int main(int argc, char **argv) {
@@ -1226,12 +1246,12 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    ptrVectorInit(&openBuffers);
+
     openLogFile(LOG_FILENAME);
     logmsg("editor is initializing...\n");
-    initEditor();
-    initUser();
-    editorSelectSyntaxHighlight(argv[1]);
     editorOpen(argv[1]);
+    initUser();
     enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");

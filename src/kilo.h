@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <string.h>
 
 /* Declare some base manuiplation functions */
 
@@ -39,7 +40,7 @@ enum vimMode {
 };
 typedef enum vimMode vimMode;
 
-struct editorConfig {
+typedef struct bufferConfig {
   int cx, cy;     /* Cursor x and y position in characters */
   int rowoff;     /* Offset of row displayed. */
   int coloff;     /* Offset of column displayed. */
@@ -56,7 +57,48 @@ struct editorConfig {
   int selection_row;
   int selection_offset;
   vimMode mode;
-};
+} bufferConfig;
+
+typedef struct ptrVector {
+  void **data;
+  int idx, cap;
+} ptrVector;
+
+static inline void ptrVectorInit(ptrVector *vec) {
+  vec->data = malloc((vec->cap = 32) * sizeof(void *));
+  vec->idx = 0;
+}
+
+static inline void ptrVectorPushBack(ptrVector *vec, void *elem) {
+  if (vec->idx == vec->cap)
+    vec->data = realloc(vec->data, vec->cap *= 2);
+  vec->data[vec->idx++] = elem;
+}
+
+static inline void *ptrVectorPopBack(ptrVector *vec) {
+  if (vec->idx == 0)
+    return NULL;
+  return vec->data[vec->idx--];
+}
+
+/* Linear search: somethimes you gotta do it! */
+static inline int ptrVectorFind(ptrVector *vec, void *elem) {
+  int idx;
+  for (idx = 0; idx < vec->idx; ++idx)
+    if (vec->data[idx] == elem)
+      return idx;
+  return -1;
+}
+
+static inline void ptrVectorDelete(ptrVector *vec, void *elem) {
+  int idx = ptrVectorFind(vec, elem);
+  if (idx != -1)
+    memmove(vec->data + idx, vec->data + idx + 1,
+            (vec->idx - idx) * sizeof(void *));
+}
+
+extern struct ptrVector openbuffers;
+extern struct bufferConfig *buffer;
 
 enum DIRECTION {
   LEFT = 0,
@@ -112,8 +154,6 @@ enum KEY_ACTION {
 #define true 1
 #define false 0
 
-extern struct editorConfig E;
-
 typedef struct {
   int firstX, firstY;
   int secondX, secondY;
@@ -129,9 +169,9 @@ typedef enum {
   (textObject) { -1, -1, -1, -1 }
 
 static inline bool badTextObject(textObject obj) {
-  return obj.firstY < 0 || obj.firstY >= E.numrows || obj.secondY < 0 ||
-         obj.secondY >= E.numrows || obj.firstX > E.row[obj.firstY].size ||
-         obj.secondX > E.row[obj.secondY].size;
+  return obj.firstY < 0 || obj.firstY >= buffer->numrows || obj.secondY < 0 ||
+         obj.secondY >= buffer->numrows || obj.firstX > buffer->row[obj.firstY].size ||
+         obj.secondX > buffer->row[obj.secondY].size;
 }
 
 void editorSetStatusMessage(const char *fmt, ...);
@@ -146,12 +186,12 @@ int getWindowSize(int ifd, int ofd, int *rows, int *cols);
 /* ======================= Editor rows implementation ======================= */
 
 /* Cursor's position in the text buffer. */
-static inline int cursorX() { return E.coloff + E.cx; }
-static inline int cursorY() { return E.rowoff + E.cy; }
+static inline int cursorX() { return buffer->coloff + buffer->cx; }
+static inline int cursorY() { return buffer->rowoff + buffer->cy; }
 
 /* Region's position in the text buffer. */
-static inline int regionX() { return E.selection_offset; }
-static inline int regionY() { return E.selection_row; }
+static inline int regionX() { return buffer->selection_offset; }
+static inline int regionY() { return buffer->selection_row; }
 
 /* Is c in between a and b? */
 static inline bool clamp(int a, int b, int c) {
@@ -164,7 +204,7 @@ static inline bool inclusive_clamp(int a, int b, int c) {
 /* Stream over text, abstracts rows. */
 typedef struct { int x, y; } charIterator;
 static inline void incrementChar(charIterator *it) {
-  if (E.row[it->y].size == it->x) {
+  if (buffer->row[it->y].size == it->x) {
     ++it->y;
     it->x = 0;
   } else
@@ -174,18 +214,18 @@ static inline void incrementChar(charIterator *it) {
 static inline void decrementChar(charIterator *it) {
   if (it->x == 0) {
     it->y--;
-    it->x = E.row[it->y].size;
+    it->x = buffer->row[it->y].size;
   } else
     --it->x;
 }
 
 static inline char loadChar(charIterator *it) {
-  if (!inclusive_clamp(0, E.numrows - 1, it->y) ||
-      !inclusive_clamp(0, E.row[it->y].size, it->x))
+  if (!inclusive_clamp(0, buffer->numrows - 1, it->y) ||
+      !inclusive_clamp(0, buffer->row[it->y].size, it->x))
     return '\0';
-  if (E.row[it->y].size == it->x)
+  if (buffer->row[it->y].size == it->x)
     return '\n';
-  return E.row[it->y].chars[it->x];
+  return buffer->row[it->y].chars[it->x];
 }
 
 void editorUpdateRow(erow *row);
@@ -212,6 +252,9 @@ textObject editorComplementTextObject(int x, int y);
 bool editorDeleteTextObject(textObject obj);
 
 int editorOpen(char *filename);
+
+bufferConfig *editorFindBuffer(char *name);
+void editorSwitchBuffer();
 
 int editorSave();
 

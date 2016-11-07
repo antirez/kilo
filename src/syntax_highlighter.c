@@ -68,14 +68,14 @@ void editorUpdateSyntax(erow *row) {
     row->hl = realloc(row->hl,row->rsize);
     memset(row->hl,HL_NORMAL,row->rsize);
 
-    if (E.syntax == NULL) return; /* No syntax, everything is HL_NORMAL. */
+    if (buffer->syntax == NULL) return; /* No syntax, everything is HL_NORMAL. */
 
     int i, prev_sep, in_string, in_comment;
     char *p;
-    char **keywords = E.syntax->keywords;
-    char *scs = E.syntax->singleline_comment_start;
-    char *mcs = E.syntax->multiline_comment_start;
-    char *mce = E.syntax->multiline_comment_end;
+    char **keywords = buffer->syntax->keywords;
+    char *scs = buffer->syntax->singleline_comment_start;
+    char *mcs = buffer->syntax->multiline_comment_start;
+    char *mce = buffer->syntax->multiline_comment_end;
 
     /* Point to the first non-space char. */
     p = row->render;
@@ -90,7 +90,7 @@ void editorUpdateSyntax(erow *row) {
 
     /* If the previous line has an open comment, this line starts
      * with an open comment state. */
-    if (row->idx > 0 && editorRowHasOpenComment(&E.row[row->idx-1]))
+    if (row->idx > 0 && editorRowHasOpenComment(&buffer->row[row->idx-1]))
         in_comment = 1;
 
     while(*p) {
@@ -196,8 +196,8 @@ void editorUpdateSyntax(erow *row) {
      * state changed. This may recursively affect all the following rows
      * in the file. */
     int oc = editorRowHasOpenComment(row);
-    if (row->hl_oc != oc && row->idx+1 < E.numrows)
-        editorUpdateSyntax(&E.row[row->idx+1]);
+    if (row->hl_oc != oc && row->idx+1 < buffer->numrows)
+        editorUpdateSyntax(&buffer->row[row->idx+1]);
     row->hl_oc = oc;
 }
 
