@@ -1042,6 +1042,27 @@ done:
   return str;
 }
 
+/* Set the cursor to the absoulute coorodinates x, y */
+bool editorSetCursorPos(int x, int y) {
+  if (y < 0 || y >= E.numrows || x < 0 || x > E.row[y].size)
+    return true;
+
+  E.cy = y - E.rowoff;
+  E.cx = x - E.coloff;
+
+  /* If we've moved the cursor off the screen, reset it. */
+  while (E.cy >= E.screenrows) {
+    ++E.rowoff;
+    --E.cy;
+  }
+  while (E.cy < 0) {
+    --E.rowoff;
+    ++E.cy;
+  }
+
+  return false;
+}
+
 void openLogFile(char *filename) {
   logfile = fopen(filename, "w+");
 }

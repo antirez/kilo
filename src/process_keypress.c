@@ -194,13 +194,11 @@ void editorProcessKeypress(int fd) {
       if (badTextObject(obj))
         break;
 
-      if (obj.firstX == cursorX() && obj.firstY == cursorY()) {
-        E.cx = obj.secondX - E.rowoff;
-        E.cy = obj.secondY - E.coloff;
-      } else {
-        E.cx = obj.firstX - E.rowoff;
-        E.cy = obj.firstY - E.coloff;
-      }
+      if (obj.firstX == cursorX() && obj.firstY == cursorY())
+        editorSetCursorPos(obj.secondX, obj.secondY);
+      else
+        editorSetCursorPos(obj.firstX, obj.firstY);
+
       break;
     }
     case CTRL_L: /* ctrl+l, clear screen */

@@ -136,6 +136,7 @@ static inline bool badTextObject(textObject obj) {
 
 void editorSetStatusMessage(const char *fmt, ...);
 void editorRefreshScreen(void);
+bool editorSetCursorPos(int x, int y);
 
 int editorReadKey(int fd);
 int getCursorPosition(int ifd, int ofd, int *rows, int *cols);
