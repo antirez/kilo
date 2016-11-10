@@ -1,5 +1,5 @@
 Kilo
-===
+====
 
 Kilo is a small text editor in less than 1K lines of code (counted with cloc).
 
@@ -24,3 +24,7 @@ style CLI.
 
 Kilo was written by Salvatore Sanfilippo aka antirez and is released
 under the BSD 2 clause license.
+
+Additions by matthewrsj
+
+**Forked from antirez/kilo**
