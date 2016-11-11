@@ -12,6 +12,10 @@ Keys:
     CTRL-S: Save
     CTRL-Q: Quit
     CTRL-F: Find string in file (ESC to exit search, arrows to navigate)
+    CTRL-U: Move up one line (alt: up arrow)
+    CTRL-D: Move down one line (alt: down arrow)
+    CTRL-R: Move right one character (alt: right arrow)
+    CTRL-L: Move left one character (alt: left arrow)
 
 Kilo does not depend on any library (not even curses). It uses fairly standard
 VT100 (and similar terminals) escape sequences. The project is in alpha
