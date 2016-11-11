@@ -1095,6 +1095,7 @@ void editorMoveCursor(int key) {
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
     switch(key) {
+    case CTRL_L:
     case ARROW_LEFT:
         if (E.cx == 0) {
             if (E.coloff) {
@@ -1113,6 +1114,7 @@ void editorMoveCursor(int key) {
             E.cx -= 1;
         }
         break;
+    case CTRL_R:
     case ARROW_RIGHT:
         if (row && filecol < row->size) {
             if (E.cx == E.screencols-1) {
@@ -1130,6 +1132,7 @@ void editorMoveCursor(int key) {
             }
         }
         break;
+    case CTRL_U:
     case ARROW_UP:
         if (E.cy == 0) {
             if (E.rowoff) E.rowoff--;
@@ -1137,6 +1140,7 @@ void editorMoveCursor(int key) {
             E.cy -= 1;
         }
         break;
+    case CTRL_D:
     case ARROW_DOWN:
         if (filerow < E.numrows) {
             if (E.cy == E.screenrows-1) {
@@ -1218,10 +1222,11 @@ void editorProcessKeypress(int fd) {
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
+    case CTRL_U:
+    case CTRL_D:
+    case CTRL_L:
+    case CTRL_R:
         editorMoveCursor(c);
-        break;
-    case CTRL_L: /* ctrl+l, clear screen */
-        /* Just refresht the line as side effect. */
         break;
     case ESC:
         /* Nothing to do for ESC in this mode. */
