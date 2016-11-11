@@ -108,31 +108,15 @@ struct editorConfig {
 
 static struct editorConfig E;
 
-enum KEY_ACTION{
-        KEY_NULL = 0,       /* NULL */
-        CTRL_C = 3,         /* Ctrl-c */
-        CTRL_D = 4,         /* Ctrl-d */
-        CTRL_F = 6,         /* Ctrl-f */
-        CTRL_H = 8,         /* Ctrl-h */
-        TAB = 9,            /* Tab */
-        CTRL_L = 12,        /* Ctrl+l */
-        ENTER = 13,         /* Enter */
-        CTRL_Q = 17,        /* Ctrl-q */
-        CTRL_S = 19,        /* Ctrl-s */
-        CTRL_U = 21,        /* Ctrl-u */
-        ESC = 27,           /* Escape */
-        BACKSPACE =  127,   /* Backspace */
-        /* The following are just soft codes, not really reported by the
-         * terminal directly. */
-        ARROW_LEFT = 1000,
-        ARROW_RIGHT,
-        ARROW_UP,
-        ARROW_DOWN,
-        DEL_KEY,
-        HOME_KEY,
-        END_KEY,
-        PAGE_UP,
-        PAGE_DOWN
+enum KEY_ACTION {
+    CTRL_A = 1, CTRL_C = 3, CTRL_D = 4, CTRL_E = 5, CTRL_F = 6, BACKSPACE = 127, TAB = 9,
+    CTRL_K = 11, CTRL_L = 12, ENTER = 13, CTRL_N = 14, CTRL_P = 16, CTRL_Q = 17, CTRL_R = 18,
+    CTRL_S = 19, CTRL_U = 21, CTRL_X = 24, CTRL_Y = 25, CTRL_Z = 26, ESC = 27, FORWARD_DELETE =  127,
+    CTRL_H = 8,
+    // The following are just soft codes, not really reported by the
+    // terminal directly.
+    ARROW_LEFT = 1000, ARROW_RIGHT, ARROW_UP, ARROW_DOWN, DEL_KEY, HOME_KEY,
+    END_KEY, PAGE_UP, PAGE_DOWN
 };
 
 void editorSetStatusMessage(const char *fmt, ...);
@@ -172,15 +156,15 @@ char *C_HL_keywords[] = {
 /* python */
 char *PY_HL_extensions[] = {".py","python",NULL};
 char *PY_HL_keywords[] = {
-	"def","if","while","for","break","return","continue","else","elif",
-	"True","False","class","and","as","assert","del","except","except:",
-	"finally","finally:", "from","global","import","in","is","lambda",
-	"nonlocal","not","or","pass","raise","return","try:","try","with",
-	"yeild",
-	/* Python types */
-	"int|","str|","unicode|","dict|","float|","repr|","long|","eval|",
-	"tuple|","list|","set|","frozenset|","chr|","unichr|","ord|","hex|",
-	"oct|","complex|",NULL
+       "def","if","while","for","break","return","continue","else","elif",
+       "True","False","class","and","as","assert","del","except","except:",
+       "finally","finally:", "from","global","import","in","is","lambda",
+       "nonlocal","not","or","pass","raise","return","try:","try","with",
+       "yeild",
+       /* Python types */
+       "int|","str|","unicode|","dict|","float|","repr|","long|","eval|",
+       "tuple|","list|","set|","frozenset|","chr|","unichr|","ord|","hex|",
+       "oct|","complex|",NULL
 };
 
 /* Here we define an array of syntax highlights by extensions, keywords,
@@ -1111,6 +1095,7 @@ void editorMoveCursor(int key) {
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
     switch(key) {
+    case CTRL_L:
     case ARROW_LEFT:
         if (E.cx == 0) {
             if (E.coloff) {
@@ -1129,6 +1114,7 @@ void editorMoveCursor(int key) {
             E.cx -= 1;
         }
         break;
+    case CTRL_R:
     case ARROW_RIGHT:
         if (row && filecol < row->size) {
             if (E.cx == E.screencols-1) {
@@ -1146,6 +1132,7 @@ void editorMoveCursor(int key) {
             }
         }
         break;
+    case CTRL_U:
     case ARROW_UP:
         if (E.cy == 0) {
             if (E.rowoff) E.rowoff--;
@@ -1153,6 +1140,7 @@ void editorMoveCursor(int key) {
             E.cy -= 1;
         }
         break;
+    case CTRL_D:
     case ARROW_DOWN:
         if (filerow < E.numrows) {
             if (E.cy == E.screenrows-1) {
@@ -1234,10 +1222,11 @@ void editorProcessKeypress(int fd) {
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
+    case CTRL_U:
+    case CTRL_D:
+    case CTRL_L:
+    case CTRL_R:
         editorMoveCursor(c);
-        break;
-    case CTRL_L: /* ctrl+l, clear screen */
-        /* Just refresht the line as side effect. */
         break;
     case ESC:
         /* Nothing to do for ESC in this mode. */
