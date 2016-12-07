@@ -65,6 +65,9 @@
 #define HL_HIGHLIGHT_STRINGS (1<<0)
 #define HL_HIGHLIGHT_NUMBERS (1<<1)
 
+/* Defining a couple functions here to prevent compiler warnings */
+time_t  time(void*);
+
 struct editorSyntax {
     char **filematch;
     char **keywords;
@@ -163,7 +166,7 @@ char *C_HL_extensions[] = {".c",".cpp",".h",".hpp",NULL};
 char *C_HL_keywords[] = {
         /* A few C / C++ keywords */
         "switch","if","while","for","break","continue","return","else",
-        "struct","union","typedef","static","enum","class",
+        "struct","union","typedef","static","enum","class","#include","#define",
         /* C types */
         "int|","long|","double|","float|","char|","unsigned|","signed|",
         "void|",NULL
@@ -198,6 +201,7 @@ void disableRawMode(int fd) {
 /* Called at exit to avoid remaining in raw mode. */
 void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
+    printf("\033[2J\033[1;1H"); /* Clears the entire screen */
 }
 
 /* Raw mode: 1960 magic shit. */
@@ -209,7 +213,7 @@ int enableRawMode(int fd) {
     atexit(editorAtExit);
     if (tcgetattr(fd,&orig_termios) == -1) goto fatal;
 
-    raw = orig_termios;  /* modify the original mode */
+    raw = orig_termios; /* modify the original mode */
     /* input modes: no break, no CR to NL, no parity check, no strip char,
      * no start/stop output control. */
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
