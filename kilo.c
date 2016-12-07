@@ -237,7 +237,6 @@ void editorAtExit(void) {
         editorFreeRow(&E.row[i]);
     }
     free(E.filename);
-    free(E.statusmsg);
     free(E.row);
 }
 
@@ -1180,6 +1179,25 @@ void editorMoveCursor(int key) {
             }
         }
         break;
+    case PAGE_UP:
+    case PAGE_DOWN:
+        if (key == PAGE_UP && E.cy != 0)
+            E.cy = 0;
+        else if (key == PAGE_DOWN && E.cy != E.screenrows-1)
+            E.cy = E.screenrows-1;
+        {
+        int times = E.screenrows-1;/* So we can see the top and bottom lines still */
+        while(times--)
+            editorMoveCursor(key == PAGE_UP ? ARROW_UP:
+                                            ARROW_DOWN);
+        }
+        break;
+    case HOME_KEY:
+	E.cx = 0;
+	break;
+    case END_KEY:
+	E.cx = E.row[filerow-1].size;
+	break;
     }
     /* Fix cx if the current line has not enough chars. */
     filerow = E.rowoff+E.cy;
@@ -1238,18 +1256,8 @@ void editorProcessKeypress(int fd) {
 		break;
     case PAGE_UP:
     case PAGE_DOWN:
-        if (c == PAGE_UP && E.cy != 0)
-            E.cy = 0;
-        else if (c == PAGE_DOWN && E.cy != E.screenrows-1)
-            E.cy = E.screenrows-1;
-        {
-        int times = E.screenrows;
-        while(times--)
-            editorMoveCursor(c == PAGE_UP ? ARROW_UP:
-                                            ARROW_DOWN);
-        }
-        break;
-
+    case HOME_KEY:
+    case END_KEY:
     case ARROW_UP:
     case ARROW_DOWN:
     case ARROW_LEFT:
