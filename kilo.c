@@ -32,9 +32,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define KILO_VERSION "0.0.1"
+#define KILO_VERSION "0.0.1.2"
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #define _GNU_SOURCE
 
 #include <termios.h>
@@ -72,8 +72,8 @@ struct editorSyntax {
     char **filematch;
     char **keywords;
     char singleline_comment_start[2];
-    char multiline_comment_start[3];
-    char multiline_comment_end[3];
+    char multiline_comment_start[4];
+    char multiline_comment_end[4];
     int flags;
 };
 
@@ -162,14 +162,32 @@ void editorSetStatusMessage(const char *fmt, ...);
  * There is no support to highlight patterns currently. */
 
 /* C / C++ */
-char *C_HL_extensions[] = {".c",".cpp",".h",".hpp",NULL};
+char *C_HL_extensions[] = {".c",".cpp",".cxx",".h",".hpp","hxx",NULL};
 char *C_HL_keywords[] = {
         /* A few C / C++ keywords */
-        "switch","if","while","for","break","continue","return","else",
-        "struct","union","typedef","static","enum","class","#include","#define",
+        "auto","switch","if","while","for","break","continue","return","else",
+        "struct","union","typedef","static","enum","class",
+	/* C preprocessor directives */
+	"#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|",
+	"#include|","#undef|",
         /* C types */
         "int|","long|","double|","float|","char|","unsigned|","signed|",
         "void|",NULL
+};
+
+/* Python */
+char *PY_HL_extensions[] = {".py",".python",NULL};
+char *PY_HL_keywords[] = {
+	/* Normal Python reserved words "self" is not exactly a keyword,*/
+	/* but I prefer it. */
+        "False","None","True","and","as","assert","break","class","continue",
+        "def","del","elif","else","except","finally","for","from","global",
+        "if","import","in","is","lambda","nonlocal","not","or","pass","raise",
+        "return","self","try","while","with","yield",
+        /* Python types */
+        "buffer|","bytearray|","chr|","complex|","dict|","eval|","float|",
+        "frozenset|","hex|","int|","list|","str|","unicode|","repr|","long|",
+        "tuple|","set|","unichr|","ord|","oct|",NULL
 };
 
 /* Here we define an array of syntax highlights by extensions, keywords,
@@ -179,7 +197,13 @@ struct editorSyntax HLDB[] = {
         /* C / C++ */
         C_HL_extensions,
         C_HL_keywords,
-        "//","/*","*/",
+        "//","/* ","*/",
+        HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
+    },
+    {
+        PY_HL_extensions,
+        PY_HL_keywords,
+        "# ","\"\"\"","\"\"\"",
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
     }
 };
@@ -198,10 +222,23 @@ void disableRawMode(int fd) {
     }
 }
 
+/* Free row's heap allocated stuff. */
+void editorFreeRow(erow *row) {
+    free(row->render);
+    free(row->chars);
+    free(row->hl);
+}
+
 /* Called at exit to avoid remaining in raw mode. */
 void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
     printf("\033[2J\033[1;1H"); /* Clears the entire screen */
+    for (int i = 0; i < E.screenrows; i++){
+        editorFreeRow(&E.row[i]);
+    }
+    free(E.filename);
+    free(E.statusmsg);
+    free(E.row);
 }
 
 /* Raw mode: 1960 magic shit. */
@@ -354,7 +391,7 @@ failed:
 /* ====================== Syntax highlight color scheme  ==================== */
 
 int is_separator(int c) {
-    return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];",c) != NULL;
+    return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];<>|&{}",c) != NULL;
 }
 
 /* Return true if the specified row last char is part of a multi line comment
@@ -400,7 +437,7 @@ void editorUpdateSyntax(erow *row) {
 
     while(*p) {
         /* Handle // comments. */
-        if (prev_sep && *p == scs[0] && *(p+1) == scs[1]) {
+        if (prev_sep && *p == scs[0] && *(p+1) == scs[1] && !in_string) {
             /* From here to end is a comment */
             memset(row->hl+i,HL_COMMENT,row->size-i);
             return;
@@ -409,7 +446,7 @@ void editorUpdateSyntax(erow *row) {
         /* Handle multi line comments. */
         if (in_comment) {
             row->hl[i] = HL_MLCOMMENT;
-            if (*p == mce[0] && *(p+1) == mce[1]) {
+            if (*p == mce[0] && *(p+1) == mce[1] && *(p+2) == mce[2]) {
                 row->hl[i+1] = HL_MLCOMMENT;
                 p += 2; i += 2;
                 in_comment = 0;
@@ -420,7 +457,7 @@ void editorUpdateSyntax(erow *row) {
                 p++; i++;
                 continue;
             }
-        } else if (*p == mcs[0] && *(p+1) == mcs[1]) {
+        } else if (*p == mcs[0] && *(p+1) == mcs[1] && !in_string) {
             row->hl[i] = HL_MLCOMMENT;
             row->hl[i+1] = HL_MLCOMMENT;
             p += 2; i += 2;
@@ -468,6 +505,9 @@ void editorUpdateSyntax(erow *row) {
             continue;
         }
 
+	if (is_separator(*p)) {
+            row->hl[i] = HL_KEYWORD1;
+	}
         /* Handle keywords and lib calls */
         if (prev_sep) {
             int j;
@@ -591,12 +631,6 @@ void editorInsertRow(int at, char *s, size_t len) {
     E.dirty++;
 }
 
-/* Free row's heap allocated stuff. */
-void editorFreeRow(erow *row) {
-    free(row->render);
-    free(row->chars);
-    free(row->hl);
-}
 
 /* Remove the row at the specified position, shifting the remainign on the
  * top. */
