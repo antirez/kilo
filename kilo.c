@@ -168,9 +168,9 @@ char *C_HL_keywords[] = {
         /* A few C / C++ keywords */
         "auto","switch","if","while","for","break","continue","return","else",
         "struct","union","typedef","static","enum","class",
-    /* C preprocessor directives */
-    "#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|",
-    "#include|","#undef|",
+        /* C preprocessor directives */
+        "#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|",
+        "#include|","#undef|",
         /* C types */
         "int|","long|","double|","float|","char|","unsigned|","signed|",
         "void|",NULL
@@ -179,8 +179,8 @@ char *C_HL_keywords[] = {
 /* Python */
 char *PY_HL_extensions[] = {".py",".python",NULL};
 char *PY_HL_keywords[] = {
-    /* Normal Python reserved words "self" is not exactly a keyword,*/
-    /* but I prefer it. */
+        /* Normal Python reserved words "self" is not exactly a keyword,*/
+        /* but it almost is, so we'll highlight it. */
         "False","None","True","and","as","assert","break","class","continue",
         "def","del","elif","else","except","finally","for","from","global",
         "if","import","in","is","lambda","nonlocal","not","or","pass","raise",
@@ -588,7 +588,7 @@ void editorSelectSyntaxHighlight(char *filename) {
 void editorUpdateRow(erow *row) {
     int tabs = 0, nonprint = 0, j, idx;
 
-   /* Create a version of the row we can directly print on the screen,
+    /* Create a version of the row we can directly print on the screen,
      * respecting tabs, substituting non printable characters with '?'. */
     free(row->render);
     for (j = 0; j < row->size; j++)
