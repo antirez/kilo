@@ -72,7 +72,7 @@ struct editorSyntax {
     char **filematch;
     char **keywords;
     char singleline_comment_start[2];
-	char singleline_doc_comment_start[4];
+    char singleline_doc_comment_start[4];
     char multiline_comment_start[4];
     char multiline_comment_end[4];
     int flags;
@@ -168,9 +168,9 @@ char *C_HL_keywords[] = {
         /* A few C / C++ keywords */
         "auto","switch","if","while","for","break","continue","return","else",
         "struct","union","typedef","static","enum","class",
-	/* C preprocessor directives */
-	"#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|",
-	"#include|","#undef|",
+    /* C preprocessor directives */
+    "#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|",
+    "#include|","#undef|",
         /* C types */
         "int|","long|","double|","float|","char|","unsigned|","signed|",
         "void|",NULL
@@ -179,8 +179,8 @@ char *C_HL_keywords[] = {
 /* Python */
 char *PY_HL_extensions[] = {".py",".python",NULL};
 char *PY_HL_keywords[] = {
-	/* Normal Python reserved words "self" is not exactly a keyword,*/
-	/* but I prefer it. */
+    /* Normal Python reserved words "self" is not exactly a keyword,*/
+    /* but I prefer it. */
         "False","None","True","and","as","assert","break","class","continue",
         "def","del","elif","else","except","finally","for","from","global",
         "if","import","in","is","lambda","nonlocal","not","or","pass","raise",
@@ -416,7 +416,7 @@ void editorUpdateSyntax(erow *row) {
     char *p;
     char **keywords = E.syntax->keywords;
     char *scs = E.syntax->singleline_comment_start;
-	char *sds = E.syntax->singleline_doc_comment_start;
+    char *sds = E.syntax->singleline_doc_comment_start;
     char *mcs = E.syntax->multiline_comment_start;
     char *mce = E.syntax->multiline_comment_end;
 
@@ -439,7 +439,7 @@ void editorUpdateSyntax(erow *row) {
     while(*p) {
         /* Handle // comments. */
         if (prev_sep && *p == scs[0] && *(p+1) == scs[1] && !in_string ||
-				prev_sep && *p == sds[0] && *(p+1) == sds[1] && !in_string) {
+                prev_sep && *p == sds[0] && *(p+1) == sds[1] && !in_string) {
             /* From here to end is a comment */
             memset(row->hl+i,HL_COMMENT,row->size-i);
             return;
@@ -507,9 +507,9 @@ void editorUpdateSyntax(erow *row) {
             continue;
         }
 
-	if (is_separator(*p)) {
+    if (is_separator(*p)) {
             row->hl[i] = HL_KEYWORD1;
-	}
+    }
         /* Handle keywords and lib calls */
         if (prev_sep) {
             int j;
@@ -1196,11 +1196,11 @@ void editorMoveCursor(int key) {
         }
         break;
     case HOME_KEY:
-	E.cx = 0;
-	break;
+    E.cx = 0;
+    break;
     case END_KEY:
-	E.cx = E.row[filerow-1].size;
-	break;
+    E.cx = E.row[filerow-1].size;
+    break;
     }
     /* Fix cx if the current line has not enough chars. */
     filerow = E.rowoff+E.cy;
@@ -1254,9 +1254,9 @@ void editorProcessKeypress(int fd) {
         editorDelChar();
         break;
     case DEL_KEY:
-		editorMoveCursor(ARROW_RIGHT);
-		editorDelChar();
-		break;
+        editorMoveCursor(ARROW_RIGHT);
+        editorDelChar();
+        break;
     case PAGE_UP:
     case PAGE_DOWN:
     case HOME_KEY:
