@@ -72,6 +72,7 @@ struct editorSyntax {
     char **filematch;
     char **keywords;
     char singleline_comment_start[2];
+	char singleline_doc_comment_start[4];
     char multiline_comment_start[4];
     char multiline_comment_end[4];
     int flags;
@@ -197,13 +198,13 @@ struct editorSyntax HLDB[] = {
         /* C / C++ */
         C_HL_extensions,
         C_HL_keywords,
-        "//","/* ","*/",
+        "//","///","/* ","*/",
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
     },
     {
         PY_HL_extensions,
         PY_HL_keywords,
-        "# ","\"\"\"","\"\"\"",
+        "# ","## ","\"\"\"","\"\"\"",
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
     }
 };
@@ -415,6 +416,7 @@ void editorUpdateSyntax(erow *row) {
     char *p;
     char **keywords = E.syntax->keywords;
     char *scs = E.syntax->singleline_comment_start;
+	char *sds = E.syntax->singleline_doc_comment_start;
     char *mcs = E.syntax->multiline_comment_start;
     char *mce = E.syntax->multiline_comment_end;
 
@@ -436,7 +438,8 @@ void editorUpdateSyntax(erow *row) {
 
     while(*p) {
         /* Handle // comments. */
-        if (prev_sep && *p == scs[0] && *(p+1) == scs[1] && !in_string) {
+        if (prev_sep && *p == scs[0] && *(p+1) == scs[1] && !in_string ||
+				prev_sep && *p == sds[0] && *(p+1) == sds[1] && !in_string) {
             /* From here to end is a comment */
             memset(row->hl+i,HL_COMMENT,row->size-i);
             return;
