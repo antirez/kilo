@@ -65,6 +65,16 @@
 #define HL_HIGHLIGHT_STRINGS (1<<0)
 #define HL_HIGHLIGHT_NUMBERS (1<<1)
 
+#define min(a,b) \
+	({ __typeof__ (a) _a = (a); \
+	 __typeof__ (b) _b = (b); \
+	 _a < _b ? _a : _b; })
+#define max(a,b) \
+	({ __typeof__ (a) _a = (a); \
+	 __typeof__ (b) _b = (b); \
+	 _a > _b ? _a : _b; })
+
+
 /* Defining a couple functions here to prevent compiler warnings */
 time_t  time(void*);
 
@@ -168,12 +178,10 @@ char *C_HL_keywords[] = {
         /* A few C / C++ keywords */
         "auto","switch","if","while","for","break","continue","return","else",
         "struct","union","typedef","static","enum","class",
-        /* C preprocessor directives */
-        "#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|",
-        "#include|","#undef|",
-        /* C types */
-        "int|","long|","double|","float|","char|","unsigned|","signed|",
-        "void|",NULL
+        /* C preprocessor directives and types*/
+        "#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|", "#include|",
+        "#undef|","int|","long|","double|","float|","char|", "unsigned|",
+        "signed|","void|",NULL
 };
 
 /* Python */
@@ -438,8 +446,8 @@ void editorUpdateSyntax(erow *row) {
 
     while(*p) {
         /* Handle // comments. */
-        if (prev_sep && *p == scs[0] && *(p+1) == scs[1] && !in_string ||
-                prev_sep && *p == sds[0] && *(p+1) == sds[1] && !in_string) {
+        if ((prev_sep && *p == scs[0] && *(p+1) == scs[1] && !in_string) ||
+                (prev_sep && *p == sds[0] && *(p+1) == sds[1] && !in_string)) {
             /* From here to end is a comment */
             memset(row->hl+i,HL_COMMENT,row->size-i);
             return;
@@ -514,18 +522,18 @@ void editorUpdateSyntax(erow *row) {
         if (prev_sep) {
             int j;
             for (j = 0; keywords[j]; j++) {
-                int klen = strlen(keywords[j]);
+                unsigned int klen = strlen(keywords[j]);
                 int kw2 = keywords[j][klen-1] == '|';
                 if (kw2) klen--;
-
-                if (!memcmp(p,keywords[j],klen) &&
-                    is_separator(*(p+klen)))
-                {
-                    /* Keyword */
-                    memset(row->hl+i,kw2 ? HL_KEYWORD2 : HL_KEYWORD1,klen);
-                    p += klen;
-                    i += klen;
-                    break;
+                if (strlen(p) >= klen) {
+                    if (!memcmp(p,keywords[j],klen) &&
+                        is_separator(*(p+klen))) {
+                        /* Keyword */
+                        memset(row->hl+i,kw2 ? HL_KEYWORD2 : HL_KEYWORD1,klen);
+                        p += klen;
+                        i += klen;
+                        break;
+                    }
                 }
             }
             if (keywords[j] != NULL) {
@@ -1188,19 +1196,19 @@ void editorMoveCursor(int key) {
             E.cy = 0;
         else if (key == PAGE_DOWN && E.cy != E.screenrows-1)
             E.cy = E.screenrows-1;
-        {
-        int times = E.screenrows-1;/* So we can see the top and bottom lines still */
+        /* So we can see the top and bottom lines still */
+        int times = E.screenrows-1;
         while(times--)
             editorMoveCursor(key == PAGE_UP ? ARROW_UP:
                                             ARROW_DOWN);
-        }
         break;
     case HOME_KEY:
-    E.cx = 0;
-    break;
+        E.cx = 0;
+        break;
     case END_KEY:
-    E.cx = E.row[filerow-1].size;
-    break;
+		if (E.cy < E.numrows)
+            E.cx = row->size;
+        break;
     }
     /* Fix cx if the current line has not enough chars. */
     filerow = E.rowoff+E.cy;
