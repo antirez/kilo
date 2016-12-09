@@ -1207,7 +1207,7 @@ void editorMoveCursor(int key) {
         E.cx = 0;
         break;
     case END_KEY:
-		if (E.cy < E.numrows)
+        if (E.rowoff + E.cy < E.numrows) /* Prevent Seg Faults */
             E.cx = row->size;
         break;
     }
