@@ -65,6 +65,7 @@
 #define HL_HIGHLIGHT_STRINGS (1<<0)
 #define HL_HIGHLIGHT_NUMBERS (1<<1)
 
+/* // incase min and max needed in the future.
 #define min(a,b) \
 	({ __typeof__ (a) _a = (a); \
 	 __typeof__ (b) _b = (b); \
@@ -73,7 +74,7 @@
 	({ __typeof__ (a) _a = (a); \
 	 __typeof__ (b) _b = (b); \
 	 _a > _b ? _a : _b; })
-
+*/
 
 /* Defining a couple functions here to prevent compiler warnings */
 time_t  time(void*);
