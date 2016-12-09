@@ -37,19 +37,18 @@
 #define _DEFAULT_SOURCE
 #define _GNU_SOURCE
 
-#include <termios.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>
 #include <ctype.h>
-#include <sys/types.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <termios.h>
 #include <unistd.h>
-#include <stdarg.h>
-#include <fcntl.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -180,7 +179,7 @@ char *C_HL_keywords[] = {
         "auto","switch","if","while","for","break","continue","return","else",
         "struct","union","typedef","static","enum","class",
         /* C preprocessor directives and types*/
-        "#define|","#endif|","#error|","#ifdef|","#ifndef|","#if|", "#include|",
+        "#define","#endif","#error","#ifdef","#ifndef","#if", "#include",
         "#undef|","int|","long|","double|","float|","char|", "unsigned|",
         "signed|","void|",NULL
 };
@@ -1191,18 +1190,6 @@ void editorMoveCursor(int key) {
             }
         }
         break;
-    case PAGE_UP:
-    case PAGE_DOWN:
-        if (key == PAGE_UP && E.cy != 0)
-            E.cy = 0;
-        else if (key == PAGE_DOWN && E.cy != E.screenrows-1)
-            E.cy = E.screenrows-1;
-        /* So we can see the top and bottom lines still */
-        int times = E.screenrows-1;
-        while(times--)
-            editorMoveCursor(key == PAGE_UP ? ARROW_UP:
-                                            ARROW_DOWN);
-        break;
     case HOME_KEY:
         E.cx = 0;
         break;
@@ -1268,6 +1255,16 @@ void editorProcessKeypress(int fd) {
         break;
     case PAGE_UP:
     case PAGE_DOWN:
+        if (c == PAGE_UP && E.cy != 0)
+            E.cy = 0;
+        else if (c == PAGE_DOWN && E.cy != E.screenrows-1)
+            E.cy = E.screenrows-1;
+        /* So we can see the top and bottom lines still */
+        int times = E.screenrows-1;
+        while(times--)
+            editorMoveCursor(c == PAGE_UP ? ARROW_UP:
+                                            ARROW_DOWN);
+        break;
     case HOME_KEY:
     case END_KEY:
     case ARROW_UP:
