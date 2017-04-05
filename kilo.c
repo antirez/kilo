@@ -191,6 +191,7 @@ void disableRawMode(int fd) {
     /* Don't even check the return value as it's too late. */
     if (E.rawmode) {
         tcsetattr(fd,TCSAFLUSH,&orig_termios);
+        write(fd, "\033[2J\033[H\033[?1049l", 15); // disables alternate screen buffer mode
         E.rawmode = 0;
     }
 }
