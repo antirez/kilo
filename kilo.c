@@ -86,10 +86,6 @@ typedef struct erow {
                            check. */
 } erow;
 
-typedef struct hlcolor {
-    int r,g,b;
-} hlcolor;
-
 struct editorConfig {
     int cx,cy;  /* Cursor x and y position in characters */
     int rowoff;     /* Offset of row displayed. */
@@ -1227,10 +1223,6 @@ void editorProcessKeypress(int fd) {
     }
 
     quit_times = KILO_QUIT_TIMES; /* Reset it to the original value. */
-}
-
-int editorFileWasModified(void) {
-    return E.dirty;
 }
 
 void initEditor(void) {
