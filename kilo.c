@@ -360,7 +360,8 @@ int editorRowHasOpenComment(erow *row) {
     if (row->hl && row->rsize && row->hl[row->rsize-1] == HL_MLCOMMENT &&
         (row->rsize < 2 || (row->render[row->rsize-2] != '*' ||
                             row->render[row->rsize-1] != '/'))) return 1;
-    return 0;
+   	
+	return 0;
 }
 
 /* Set every byte of row->hl (that corresponds to every character in the line)
@@ -372,13 +373,15 @@ void editorUpdateSyntax(erow *row) {
     if (E.syntax == NULL) return; /* No syntax, everything is HL_NORMAL. */
 
     int i, prev_sep, in_string, in_comment;
-    char *p;
+	int rowidx_backup;
+	char *p;
     char **keywords = E.syntax->keywords;
     char *scs = E.syntax->singleline_comment_start;
     char *mcs = E.syntax->multiline_comment_start;
     char *mce = E.syntax->multiline_comment_end;
-
-    /* Point to the first non-space char. */
+	char* temp;
+    
+	/* Point to the first non-space char. */
     p = row->render;
     i = 0; /* Current char offset */
     while(*p && isspace(*p)) {
@@ -389,12 +392,37 @@ void editorUpdateSyntax(erow *row) {
     in_string = 0; /* Are we inside "" or '' ? */
     in_comment = 0; /* Are we inside multi-line comment? */
 
-    /* If the previous line has an open comment, this line starts
-     * with an open comment state. */
-    if (row->idx > 0 && editorRowHasOpenComment(&E.row[row->idx-1]))
-        in_comment = 1;
+  	rowidx_backup = row->idx;
+	temp = p;
+	while(row->idx > 0 && *temp != mce[0] && *(temp+1) != mce[1]) {
+		if(editorRowHasOpenComment(&E.row[row->idx-1]))
+			in_comment = 1;
+		row->idx--;
+		temp = E.row[row->idx].render;
+		while(*temp && isspace(*temp)) 
+			temp++;
+	}
+	row->idx = rowidx_backup;
 
-    while(*p) {
+	rowidx_backup = row->idx;
+	temp = p;
+	if(!in_comment && *(temp) == mce[0] && *(temp+1) == mce[1]) {
+		while(row->idx > 0) {	
+			while(*temp && isspace(*temp)) 
+				temp++;
+			if(*temp != mcs[0] && *(temp+1) != mcs[1])
+				in_comment = 0;
+			else {
+				in_comment = 1;
+				break;
+			}
+			row->idx--;
+			temp = E.row[row->idx].render;
+		}
+	}
+	row->idx = rowidx_backup;
+	
+	while(*p) {
         /* Handle // comments. */
         if (prev_sep && *p == scs[0] && *(p+1) == scs[1]) {
             /* From here to end is a comment */
@@ -413,16 +441,15 @@ void editorUpdateSyntax(erow *row) {
                 continue;
             } else {
                 prev_sep = 0;
-                p++; i++;
+                p+=1; i+=1;
                 continue;
             }
         } else if (*p == mcs[0] && *(p+1) == mcs[1]) {
             row->hl[i] = HL_MLCOMMENT;
             row->hl[i+1] = HL_MLCOMMENT;
             p += 2; i += 2;
-            in_comment = 1;
             prev_sep = 0;
-            continue;
+			continue;
         }
 
         /* Handle "" and '' */
@@ -603,7 +630,7 @@ void editorDelRow(int at) {
     row = E.row+at;
     editorFreeRow(row);
     memmove(E.row+at,E.row+at+1,sizeof(E.row[0])*(E.numrows-at-1));
-    for (int j = at; j < E.numrows-1; j++) E.row[j].idx++;
+    for (int j = at; j < E.numrows-1; j++) E.row[j].idx--;
     E.numrows--;
     E.dirty++;
 }
@@ -998,6 +1025,7 @@ void editorFind(int fd) {
 #define FIND_RESTORE_HL do { \
     if (saved_hl) { \
         memcpy(E.row[saved_hl_line].hl,saved_hl, E.row[saved_hl_line].rsize); \
+        free(saved_hl); \
         saved_hl = NULL; \
     } \
 } while (0)
