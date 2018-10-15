@@ -1227,7 +1227,13 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
-        exit(0);
+		struct abuf temp = ABUF_INIT;
+		abAppend(&temp, "\x1b[2J", 4);
+		abAppend(&temp, "\x1b[H", 3);
+		
+		write(STDOUT_FILENO, temp.b, temp.len);
+		abFree(&temp);
+		exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
         editorSave();
