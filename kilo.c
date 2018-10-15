@@ -50,6 +50,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -113,7 +114,9 @@ enum KEY_ACTION{
         CTRL_C = 3,         /* Ctrl-c */
         CTRL_D = 4,         /* Ctrl-d */
         CTRL_F = 6,         /* Ctrl-f */
-        CTRL_H = 8,         /* Ctrl-h */
+        CTRL_G = 7,			/* Ctrl-g */
+		CTRL_T = 20,		/* Ctrl-T */
+		CTRL_H = 8,         /* Ctrl-h */
         TAB = 9,            /* Tab */
         CTRL_L = 12,        /* Ctrl+l */
         ENTER = 13,         /* Enter */
@@ -180,6 +183,14 @@ struct editorSyntax HLDB[] = {
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
     }
 };
+
+void moveToEnd() {
+	E.cy = E.numrows - 1;
+}
+
+void moveToFirst() {
+	E.cy = 0;
+}
 
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
 
@@ -537,7 +548,7 @@ int editorSyntaxToColor(int hl) {
     case HL_KEYWORD1: return 33;    /* yellow */
     case HL_KEYWORD2: return 32;    /* green */
     case HL_STRING: return 35;      /* magenta */
-    case HL_NUMBER: return 31;      /* red */
+	case HL_NUMBER: return 37;      /* white */
     case HL_MATCH: return 34;      /* blu */
     default: return 37;             /* white */
     }
@@ -1202,7 +1213,13 @@ void editorProcessKeypress(int fd) {
         /* We ignore ctrl-c, it can't be so simple to lose the changes
          * to the edited file. */
         break;
-    case CTRL_Q:        /* Ctrl-q */
+	case CTRL_G:
+		moveToEnd();
+		break;
+	case CTRL_T:
+		moveToFirst();
+		break;
+	case CTRL_Q:        /* Ctrl-q */
         /* Quit if the file was already saved. */
         if (E.dirty && quit_times) {
             editorSetStatusMessage("WARNING!!! File has unsaved changes. "
