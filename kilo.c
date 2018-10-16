@@ -192,6 +192,10 @@ void moveToFirst() {
 	E.cy = 0;
 }
 
+void moveToLineEnd() {
+	E.cx = E.row[E.cy].size;
+}
+
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
 
 /* ======================= Low level terminal handling ====================== */
@@ -1218,6 +1222,9 @@ void editorProcessKeypress(int fd) {
 		break;
 	case CTRL_T:
 		moveToFirst();
+		break;
+	case CTRL_D:
+		moveToLineEnd();
 		break;
 	case CTRL_Q:        /* Ctrl-q */
         /* Quit if the file was already saved. */
