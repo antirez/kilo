@@ -737,7 +737,7 @@ void editorRowAppendString(erow *row, char *s, size_t len) {
     memcpy(row->chars+row->size,s,len);
     row->size += len;
     row->chars[row->size] = '\0';
-    editorUpdateRow(row);
+	editorUpdateRow(row);
     E.dirty++;
 }
 
@@ -812,7 +812,8 @@ fixcursor:
 void editorDelChar() {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+	erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+	int delRowSize = row->size;
 
     if (!row || (filecol == 0 && filerow == 0)) return;
     if (filecol == 0) {
@@ -821,17 +822,21 @@ void editorDelChar() {
         filecol = E.row[filerow-1].size;
         editorRowAppendString(&E.row[filerow-1],row->chars,row->size);
         editorDelRow(filerow);
-        row = NULL;
+		row = NULL;
         if (E.cy == 0)
             E.rowoff--;
         else
             E.cy--;
-        E.cx = filecol;
-        if (E.cx >= E.screencols) {
-            int shift = (E.screencols-E.cx)+1;
+		
+		E.coloff = E.row[filerow-1].size - E.screencols;
+        E.cx = E.screencols - delRowSize;
+		/*		
+		if (E.cx >= E.screencols) {
+			int shift = (E.screencols-E.cx)+1;
             E.cx -= shift;
             E.coloff += shift;
-        }
+		}
+		*/
     } else {
         editorRowDelChar(row,filecol-1);
         if (E.cx == 0 && E.coloff)
@@ -1198,7 +1203,7 @@ void editorMoveCursor(int key) {
             } else {
                 E.cy += 1;
             }
-        }
+        } 
         break;
     case ARROW_UP:
         if (E.cy == 0) {
