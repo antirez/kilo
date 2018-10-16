@@ -184,47 +184,32 @@ struct editorSyntax HLDB[] = {
     }
 };
 
-void editorRefreshScreen(); // forward declear to avoid compile exception
+void editorRefreshScreen();
 
 void moveToEnd() {
 	int factor = 0;
-
-	if(E.numrows > E.screenrows) 
+	
+	if(E.numrows > E.screencols) 
 		factor = E.numrows / E.screenrows;
 	
-	if(factor > 0) {
-		if(E.cy != E.screenrows) {
-			E.cy = E.screenrows - 1;
-			E.cx = 0;
-		}
+	if(factor) {
+		if (E.cy == E.screencols-2)
+			E.cy = E.numrows - 1;
+		E.coloff++;
 		editorRefreshScreen();
-		if(++E.rowoff + E.cy <= E.numrows-1) {
-			editorRefreshScreen();
-			moveToEnd();
-		} else 
-			E.rowoff--;
-	} else {
-		E.cy = E.numrows - 1;
-		E.cx = 0;
+		moveToEnd();
 	}
+	E.cy = E.numrows - 3 - E.rowoff;
+	
+
 }
 
 void moveToFirst() {
-	if(E.rowoff > 0) {
-		E.cy = 0;
-		E.cx = 0;
-		editorRefreshScreen();
-		E.rowoff--;
-		editorRefreshScreen();
-		moveToFirst();
-	} else { 
-		E.cy = 0;
-		E.cx = 0;
-	}
+	E.cy = 0;
 }
 
 void moveToLineEnd() {
-	E.cx = E.row[E.rowoff + E.cy].size;
+	E.cx = E.row[E.cy].size;
 }
 
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
