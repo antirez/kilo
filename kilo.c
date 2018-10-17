@@ -864,7 +864,9 @@ void editorDelChar() {
 	erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 	int delRowSize = row->size;
 
-    if (!row || (filecol == 0 && filerow == 0)) return;
+    if (!row || (filecol == 0 && filerow == 0)) {
+		return;
+	} 
     if (filecol == 0) {
         /* Handle the case of column 0, we need to move the current line
          * on the right of the previous one. */
@@ -876,16 +878,18 @@ void editorDelChar() {
             E.rowoff--;
         else
             E.cy--;
-		
-		E.coloff = E.row[filerow-1].size - E.screencols;
-        E.cx = E.screencols - delRowSize;
-		/*		
-		if (E.cx >= E.screencols) {
-			int shift = (E.screencols-E.cx)+1;
-            E.cx -= shift;
-            E.coloff += shift;
+	
+		if(E.row[filerow-1].size > E.screencols) {
+			E.coloff = E.row[filerow-1].size - E.screencols;
+        	E.cx = E.screencols - delRowSize;
+		} else {
+			E.cx = filecol;		
+			if (E.cx >= E.screencols) {
+				int shift = (E.screencols-E.cx)+1;
+       	    	E.cx -= shift;
+       	    	E.coloff += shift;
+			}
 		}
-		*/
     } else {
         editorRowDelChar(row,filecol-1);
         if (E.cx == 0 && E.coloff)
@@ -998,9 +1002,9 @@ void editorRefreshScreen(void) {
 
         if (filerow >= E.numrows) {
             if (E.numrows == 0 && y == E.screenrows/3) {
-                char welcome[80];
+                char welcome[100];
                 int welcomelen = snprintf(welcome,sizeof(welcome),
-                    "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
+                    "Hyunsoo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
                 int padding = (E.screencols-welcomelen)/2;
                 if (padding) {
                     abAppend(&ab,"~",1);
@@ -1451,7 +1455,7 @@ void initEditor(void) {
 				}		
 			}
 		}
-	} 
+	}
 	
 	if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
                       &E.screenrows,&E.screencols) == -1)
