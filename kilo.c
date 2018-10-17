@@ -118,6 +118,7 @@ typedef struct _rc {
 
 static struct editorConfig E;
 Rc myrc;
+char* copyText = NULL; 
 
 enum KEY_ACTION{
         KEY_NULL = 0,       /* NULL */
@@ -134,7 +135,8 @@ enum KEY_ACTION{
         CTRL_Q = 17,        /* Ctrl-q */
         CTRL_S = 19,        /* Ctrl-s */
         CTRL_U = 21,        /* Ctrl-u */
-        ESC = 27,           /* Escape */
+        CTRL_V = 22,		/* Ctrl-v */
+		ESC = 27,           /* Escape */
         BACKSPACE =  127,   /* Backspace */
         /* The following are just soft codes, not really reported by the
          * terminal directly. */
@@ -196,6 +198,8 @@ struct editorSyntax HLDB[] = {
 };
 
 void editorRefreshScreen(); // forward declear to avoid compile exception
+void copyOneLine();
+void pasteOneLine();
 
 void moveToEnd() {
 	int factor = 0;
@@ -1327,7 +1331,11 @@ void editorProcessKeypress(int fd) {
     case CTRL_C:        /* Ctrl-c */
         /* We ignore ctrl-c, it can't be so simple to lose the changes
          * to the edited file. */
-        break;
+        copyOneLine();	
+		break;
+	case CTRL_V:
+		pasteOneLine();
+		break;
 	case CTRL_G:
 		moveToEnd();
 		break;
@@ -1404,6 +1412,28 @@ void editorProcessKeypress(int fd) {
 int editorFileWasModified(void) {
     return E.dirty;
 }
+
+void copyOneLine() {
+	int filerow = E.rowoff+E.cy;
+	erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+	char* str = (char*)malloc(sizeof(char)*row->size);
+	strcpy(str, row->chars);
+	if(copyText)
+		free(copyText);
+	copyText = str;
+}
+
+void pasteOneLine() {
+	if(copyText == NULL) 
+		return;
+	
+	int size = strlen(copyText);
+
+	for(int i=0; i<size; i++) {
+		editorInsertChar(copyText[i]);
+	}
+}
+
 
 int vt100_color(char* str, int whatColor) {
 	if(!strcmp(str, "cyan"))
