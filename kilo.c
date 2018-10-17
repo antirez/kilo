@@ -1444,7 +1444,7 @@ void initEditor(void) {
 						myrc.keywordColor2 = vt100_color(ret, 0);
 					if(!strcmp(type,"indent"))
 						myrc.indent = atoi(ret);
-					if(!strcmp(type,"stringcolorg"))
+					if(!strcmp(type,"stringcolor"))
 						myrc.stringColor = vt100_color(ret, 0);
 					if(!strcmp(type,"numbercolor"))
 						myrc.numberColor = vt100_color(ret, 0);
