@@ -107,7 +107,17 @@ struct editorConfig {
     struct editorSyntax *syntax;    /* Current syntax highlight, or NULL. */
 };
 
+typedef struct _rc {
+	int indent;
+	int background;
+	int keywordColor1; 
+	int keywordColor2;
+	int stringColor;
+	int numberColor;
+}Rc; 
+
 static struct editorConfig E;
+Rc myrc;
 
 enum KEY_ACTION{
         KEY_NULL = 0,       /* NULL */
@@ -232,6 +242,45 @@ void moveToLineEnd() {
 /* ======================= Low level terminal handling ====================== */
 
 static struct termios orig_termios; /* In order to restore at exit.*/
+
+#define MAX_STR_LEN 4000
+
+// 문자열 우측 공백문자 삭제 함수
+char* rtrim(char* s) {
+  char t[MAX_STR_LEN];
+  char *end;
+
+  strcpy(t, s); // 이것은 Visual C 2005용
+  end = t + strlen(t) - 1;
+  while (end != t && isspace(*end))
+    end--;
+  *(end + 1) = '\0';
+  s = t;
+
+  return s;
+}
+
+// 문자열 좌측 공백문자 삭제 함수
+char* ltrim(char *s) {
+  char* begin;
+  begin = s;
+
+  while (*begin != '\0') {
+    if (isspace(*begin))
+      begin++;
+    else {
+      s = begin;
+      break;
+    }
+  }
+
+  return s;
+}
+
+// 문자열 앞뒤 공백 모두 삭제 함수
+char* trim(char *s) {
+  return rtrim(ltrim(s));
+}
 
 void disableRawMode(int fd) {
     /* Don't even check the return value as it's too late. */
@@ -580,10 +629,10 @@ int editorSyntaxToColor(int hl) {
     switch(hl) {
     case HL_COMMENT:
     case HL_MLCOMMENT: return 36;     /* cyan */
-    case HL_KEYWORD1: return 33;    /* yellow */
-    case HL_KEYWORD2: return 32;    /* green */
-    case HL_STRING: return 35;      /* magenta */
-	case HL_NUMBER: return 37;      /* white */
+    case HL_KEYWORD1: return myrc.keywordColor1; // return 33;    /* yellow */
+    case HL_KEYWORD2: return myrc.keywordColor2; // return 32;    /* green */
+    case HL_STRING: return myrc.stringColor; // return 35;      /* magenta */
+	case HL_NUMBER: return myrc.numberColor; // return 37;      /* white */
     case HL_MATCH: return 34;      /* blu */
     default: return 37;             /* white */
     }
@@ -621,12 +670,12 @@ void editorUpdateRow(erow *row) {
     for (j = 0; j < row->size; j++)
         if (row->chars[j] == TAB) tabs++;
 
-    row->render = malloc(row->size + tabs*8 + nonprint*9 + 1);
+    row->render = malloc(row->size + tabs*myrc.indent + nonprint*9 + 1);
     idx = 0;
     for (j = 0; j < row->size; j++) {
         if (row->chars[j] == TAB) {
             row->render[idx++] = ' ';
-            while((idx+1) % 8 != 0) row->render[idx++] = ' ';
+            while((idx+1) % myrc.indent != 0) row->render[idx++] = ' ';
         } else {
             row->render[idx++] = row->chars[j];
         }
@@ -937,11 +986,14 @@ void editorRefreshScreen(void) {
     int y;
     erow *r;
     char buf[32];
+	char background_color[32];
     struct abuf ab = ABUF_INIT;
 
     abAppend(&ab,"\x1b[?25l",6); /* Hide cursor. */
     abAppend(&ab,"\x1b[H",3); /* Go home. */
-    for (y = 0; y < E.screenrows; y++) {
+ 	sprintf(background_color, "\x1b[%dm", myrc.background);
+	abAppend(&ab, background_color, strlen(background_color));
+	for (y = 0; y < E.screenrows; y++) {
         int filerow = E.rowoff+y;
 
         if (filerow >= E.numrows) {
@@ -994,7 +1046,7 @@ void editorRefreshScreen(void) {
                         int clen = snprintf(buf,sizeof(buf),"\x1b[%dm",color);
                         current_color = color;
                         abAppend(&ab,buf,clen);
-                    }
+					}
                     abAppend(&ab,c+j,1);
                 }
             }
@@ -1040,7 +1092,7 @@ void editorRefreshScreen(void) {
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
     if (row) {
         for (j = E.coloff; j < (E.cx+E.coloff); j++) {
-            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
+            if (j < row->size && row->chars[j] == TAB) cx += myrc.indent-1-((cx)%myrc.indent);
             cx++;
         }
     }
@@ -1327,6 +1379,25 @@ int editorFileWasModified(void) {
     return E.dirty;
 }
 
+int vt100_color(char* str, int whatColor) {
+	if(!strcmp(str, "cyan"))
+		return whatColor ? 36+10 : 36;
+	if(!strcmp(str, "yellow"))
+		return whatColor ? 33+10 : 33;
+	if(!strcmp(str, "green"))
+		return whatColor ? 32+10 : 32;
+	if(!strcmp(str, "magenta"))
+		return whatColor ? 35+10 : 35;
+	if(!strcmp(str, "red"))
+		return whatColor ? 31+10 : 31;
+	if(!strcmp(str, "blue"))
+		return whatColor ? 34+10 : 34;
+	if(!strcmp(str, "white"))
+		return whatColor ? 37+10 : 37;
+
+	return whatColor ? 39+10 : 39; // default
+}
+
 void initEditor(void) {
     E.cx = 0;
     E.cy = 0;
@@ -1337,7 +1408,52 @@ void initEditor(void) {
     E.dirty = 0;
     E.filename = NULL;
     E.syntax = NULL;
-    if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
+
+	FILE* fp;
+	char str[100];
+	char type[100];
+	char* separate;
+	char* ret;
+	char* types[] = {"background", "keywordcolor1", "keywordcolor2", "indent", "stringcolor", "numbercolor"};
+
+	myrc.indent = 8;
+	myrc.background = 49; // default;
+	myrc.keywordColor1 = 33;
+	myrc.keywordColor2 = 32;
+	myrc.stringColor = 35;
+	myrc.numberColor = 37;
+
+	fp = fopen("./.kilorc", "r");
+	
+	if(fp != NULL) {
+		while(fgets(str, 100, fp) != NULL) {
+			str[strlen(str)-1] = '\0';
+			separate = strtok(str, "=");
+			strcpy(type, separate);
+			strcpy(type, trim(type));
+			separate = strtok(NULL,"=");
+			ret = trim(separate);
+			
+			for(int i=0; i<6; i++) {
+				if(!strcmp(types[i], type)) {
+					if(!strcmp(type,"background")) 
+						myrc.background = vt100_color(ret, 1);
+					if(!strcmp(type,"keywordcolor1"))
+						myrc.keywordColor1 = vt100_color(ret, 0);
+					if(!strcmp(type,"keywordcolor2"))
+						myrc.keywordColor2 = vt100_color(ret, 0);
+					if(!strcmp(type,"indent"))
+						myrc.indent = atoi(ret);
+					if(!strcmp(type,"stringcolorg"))
+						myrc.stringColor = vt100_color(ret, 0);
+					if(!strcmp(type,"numbercolor"))
+						myrc.numberColor = vt100_color(ret, 0);
+				}		
+			}
+		}
+	} 
+	
+	if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
                       &E.screenrows,&E.screencols) == -1)
     {
         perror("Unable to query the screen for size (columns / rows)");
