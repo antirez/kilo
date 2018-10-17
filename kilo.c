@@ -126,6 +126,7 @@ enum KEY_ACTION{
         CTRL_F = 6,         /* Ctrl-f */
         CTRL_G = 7,			/* Ctrl-g */
 		CTRL_T = 20,		/* Ctrl-T */
+		CTRL_X = 24,		/* CTRL-X */
 		CTRL_H = 8,         /* Ctrl-h */
         TAB = 9,            /* Tab */
         CTRL_L = 12,        /* Ctrl+l */
@@ -234,6 +235,11 @@ void moveToFirst() {
 }
 
 void moveToLineEnd() {
+	int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+
+	if(!filerow && !filecol)
+		return;
 	E.cx = E.row[E.rowoff + E.cy].size;
 }
 
@@ -984,6 +990,19 @@ void abFree(struct abuf *ab) {
     free(ab->b);
 }
 
+void removeOneLine() {
+	int filerow = E.rowoff+E.cy;
+	erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+	int size = row->size;
+
+	if(!row) 
+		return;
+
+	moveToLineEnd();
+	for(int i=0; i<size+1; i++) 		
+		editorDelChar();
+}
+
 /* This function writes the whole screen using VT100 escape characters
  * starting from the logical state of the editor in the global state 'E'. */
 void editorRefreshScreen(void) {
@@ -1294,7 +1313,7 @@ void editorMoveCursor(int key) {
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
-#define KILO_QUIT_TIMES 3
+#define KILO_QUIT_TIMES 2
 void editorProcessKeypress(int fd) {
     /* When the file is modified, requires Ctrl-q to be pressed N times
      * before actually quitting. */
@@ -1317,6 +1336,9 @@ void editorProcessKeypress(int fd) {
 		break;
 	case CTRL_D:
 		moveToLineEnd();
+		break;
+	case CTRL_X:
+		removeOneLine();
 		break;
 	case CTRL_Q:        /* Ctrl-q */
         /* Quit if the file was already saved. */
