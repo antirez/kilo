@@ -136,6 +136,7 @@ enum KEY_ACTION{
         CTRL_S = 19,        /* Ctrl-s */
         CTRL_U = 21,        /* Ctrl-u */
         CTRL_V = 22,		/* Ctrl-v */
+		CTRL_Z = 26,		/* ctrl-z */
 		ESC = 27,           /* Escape */
         BACKSPACE =  127,   /* Backspace */
         /* The following are just soft codes, not really reported by the
@@ -197,9 +198,114 @@ struct editorSyntax HLDB[] = {
     }
 };
 
-void editorRefreshScreen(); // forward declear to avoid compile exception
+// stack
+#define TRUE 1
+#define FALSE 0
+
+typedef struct _History { // singleton object
+	int len;
+	int cx;
+	int cy;
+	short isTracing;
+}History;
+
+typedef struct _node {
+	History data;
+	struct _node* next;
+}Node;
+
+typedef struct _listStack {
+	Node* head;
+}ListStack;
+
+typedef ListStack Stack;
+Stack stack; // global-variable
+History ht;	  // global-variable
+
+void StackInit() {
+	stack.head = NULL;
+}
+void HistoryInit() {
+	ht.isTracing = TRUE;
+	ht.len = 0;
+	ht.cx = 0;
+	ht.cy = 0;
+}
+int SIsEmpty() {
+	if(stack.head == NULL)
+		return TRUE;
+	else 
+		return FALSE;
+}
+void SPush() {
+	Node* newNode = (Node*)malloc(sizeof(Node));
+	History temp = ht;
+	newNode->data = temp;
+	newNode->next = stack.head;
+	stack.head = newNode;
+}
+
+void turnOffTracing() {
+	if(ht.isTracing) {
+		SPush();
+		HistoryInit();
+	}
+}
+
+History SPop() {
+	History rdata;
+	Node* rnode;
+
+	if(SIsEmpty(stack)) {
+		printf("Stack Memory Error!");
+		exit(-1);
+	}
+
+	rdata = stack.head->data;
+	rnode = stack.head;
+
+	stack.head = stack.head->next;
+	free(rnode);
+
+	return rdata;
+}
+History SPeek() {
+	if(SIsEmpty(stack)) {
+		printf("Stack Memory Error!");
+		exit(-1);
+	}
+
+	return stack.head->data;
+}
+
+
+void editorRefreshScreen(); // forward declare to avoid compile exception
+void editorDelChar(); // forward declare
 void copyOneLine();
 void pasteOneLine();
+
+void undo() {
+	History temp;
+	
+	if(ht.len) 
+		turnOffTracing();
+
+	if(SIsEmpty())
+		return;
+
+	temp = SPop();
+	
+	for(int i=0; i<temp.len; i++)  
+		editorDelChar();
+//	if(temp.len > 1)
+	//	editorDelChar();
+
+//	printf("%d ", E.cx);
+//	while(!SIsEmpty()) {
+//		printf("%d ", SPop().cx);
+//	}
+//	exit(1);
+}
 
 void moveToEnd() {
 	int factor = 0;
@@ -677,8 +783,11 @@ void editorUpdateRow(erow *row) {
    /* Create a version of the row we can directly print on the screen,
      * respecting tabs, substituting non printable characters with '?'. */
     free(row->render);
-    for (j = 0; j < row->size; j++)
-        if (row->chars[j] == TAB) tabs++;
+    for (j = 0; j < row->size; j++) {
+        if (row->chars[j] == TAB) {
+			tabs++;
+		}
+	}
 
     row->render = malloc(row->size + tabs*myrc.indent + nonprint*9 + 1);
     idx = 0;
@@ -813,7 +922,17 @@ void editorRowDelChar(erow *row, int at) {
 void editorInsertChar(int c) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+	erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+
+	if(c == TAB) {
+		turnOffTracing();
+		ht.len = 1;
+	} else if(isspace(c)) {
+		turnOffTracing();
+		ht.len = 1;
+	} else if(ht.isTracing == TRUE) {
+		ht.len++;
+	}
 
     /* If the row where the cursor is currently located does not exist in our
      * logical representaion of the file, add enough empty rows as needed. */
@@ -1119,7 +1238,7 @@ void editorRefreshScreen(void) {
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
     if (row) {
         for (j = E.coloff; j < (E.cx+E.coloff); j++) {
-            if (j < row->size && row->chars[j] == TAB) cx += myrc.indent-1-((cx)%myrc.indent);
+			if (j < row->size && row->chars[j] == TAB) cx += myrc.indent-1-((cx)%myrc.indent);
             cx++;
         }
     }
@@ -1326,6 +1445,8 @@ void editorProcessKeypress(int fd) {
     int c = editorReadKey(fd);
     switch(c) {
     case ENTER:         /* Enter */
+		ht.len++;
+		turnOffTracing();
         editorInsertNewline();
         break;
     case CTRL_C:        /* Ctrl-c */
@@ -1347,6 +1468,9 @@ void editorProcessKeypress(int fd) {
 		break;
 	case CTRL_X:
 		removeOneLine();
+		break;
+	case CTRL_Z:
+		undo();
 		break;
 	case CTRL_Q:        /* Ctrl-q */
         /* Quit if the file was already saved. */
@@ -1393,6 +1517,7 @@ void editorProcessKeypress(int fd) {
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
+		turnOffTracing();
         editorMoveCursor(c);
         break;
     case CTRL_L: /* ctrl+l, clear screen */
@@ -1523,7 +1648,9 @@ int main(int argc, char **argv) {
         fprintf(stderr,"Usage: kilo <filename>\n");
         exit(1);
     }
-
+	StackInit();
+	HistoryInit();
+	
     initEditor();
     editorSelectSyntaxHighlight(argv[1]);
     editorOpen(argv[1]);
