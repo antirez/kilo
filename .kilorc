@@ -1,0 +1,4 @@
+indent = 8
+keywordcolor1 = red
+keywordcolor2 = cyan
+stringcolor = white
