@@ -278,7 +278,6 @@ History SPeek() {
 	return stack.head->data;
 }
 
-
 void editorRefreshScreen(); // forward declare to avoid compile exception
 void editorDelChar(); // forward declare
 void copyOneLine();
@@ -294,17 +293,13 @@ void undo() {
 		return;
 
 	temp = SPop();
-	
+	E.cx = temp.cx + 1;
+	E.cy = temp.cy;
+	editorRefreshScreen();
 	for(int i=0; i<temp.len; i++)  
 		editorDelChar();
-//	if(temp.len > 1)
-	//	editorDelChar();
 
-//	printf("%d ", E.cx);
-//	while(!SIsEmpty()) {
-//		printf("%d ", SPop().cx);
-//	}
-//	exit(1);
+	HistoryInit();
 }
 
 void moveToEnd() {
@@ -925,12 +920,22 @@ void editorInsertChar(int c) {
 	erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
 	if(c == TAB) {
+		ht.cx = filecol;
+		ht.cy = filerow;
 		turnOffTracing();
 		ht.len = 1;
+		ht.cx = filecol;
+		ht.cy = filerow;
 	} else if(isspace(c)) {
 		turnOffTracing();
+		ht.cx = filecol;
+		ht.cy = filerow;
 		ht.len = 1;
+		ht.cx = filecol;
+		ht.cy = filerow;
 	} else if(ht.isTracing == TRUE) {
+		ht.cx = filecol;
+		ht.cy = filerow;
 		ht.len++;
 	}
 
@@ -1517,8 +1522,7 @@ void editorProcessKeypress(int fd) {
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
-		turnOffTracing();
-        editorMoveCursor(c);
+		editorMoveCursor(c);
         break;
     case CTRL_L: /* ctrl+l, clear screen */
         /* Just refresht the line as side effect. */
