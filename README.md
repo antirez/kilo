@@ -18,6 +18,7 @@ Keys:
 	CTRL-T: Move to first of current line
 	CTRL-D: Move to end of file
 	CTRL-X: Remove one line
+	CTRL-P: Replace from original string to what you want to replace it
 
 Kilo does not depend on any library (not even curses). It uses fairly standard
 VT100 (and similar terminals) escape sequences. The project is in alpha
