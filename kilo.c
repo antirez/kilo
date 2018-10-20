@@ -126,6 +126,7 @@ enum KEY_ACTION{
         CTRL_D = 4,         /* Ctrl-d */
         CTRL_F = 6,         /* Ctrl-f */
         CTRL_G = 7,			/* Ctrl-g */
+		CTRL_P = 16,		/* Ctrl-p */
 		CTRL_T = 20,		/* Ctrl-T */
 		CTRL_X = 24,		/* CTRL-X */
 		CTRL_H = 8,         /* Ctrl-h */
@@ -1439,6 +1440,133 @@ void editorMoveCursor(int key) {
     }
 }
 
+int flag = 0;
+
+typedef struct _info {
+	int* offset;
+	int len;
+	int rowidx;
+	int num;
+}Info;
+
+void replace() {
+	char target[300] = {0,};
+	char org_str[300] = {0,};
+	int len = 0;
+	int c;
+	char* row_offset;
+	char* before_row_offset;
+	int depth = 2;
+	int offset_depth = 2;
+	int offset_count = 0;
+	int target_len = 0;
+	int ret_cx, ret_cy, ret_rowoff, ret_coloff;
+	Info* info = (Info*)malloc(sizeof(Info) * depth);
+
+	while(1) {
+		editorSetStatusMessage("Replace : %s ", target);
+		editorRefreshScreen();
+		c = editorReadKey(0);
+
+		if (c == DEL_KEY || c == BACKSPACE) {
+			if(len != 0)
+				target[--len] = '\0';
+		} else if(c == ESC) {
+			editorSetStatusMessage("");
+			return;
+		} else if(c == ENTER) {
+			if(!strstr(target, "->")) {
+				editorSetStatusMessage("Bad input! (Usage : original_sring -> target_string)");
+				editorRefreshScreen();	
+			} else {
+				char* token = strtok(target, "->");
+				strcpy(org_str, token);
+				org_str[strlen(org_str)-1] = '\0';
+				token = strtok(NULL, "-> ");
+				strcpy(target, token);
+			}
+			goto repl;	
+		} else if(isprint(c)) {
+			target[len++] = c;
+			target[len] = '\0';
+		}
+	}
+	
+repl:
+	len = 0; // the number of founded string
+	target_len = strlen(target);
+	ret_cx = E.cx;
+	ret_cy = E.cy;
+	for(int i=0; i<E.numrows; i++) {
+		row_offset = strstr(E.row[i].chars, org_str);
+		before_row_offset = E.row[i].chars;
+		info[len].num = 0;
+		
+		while(row_offset) {
+			if(offset_count == 0) {
+				info[len].offset = (int*)malloc(sizeof(int) * offset_depth);
+			}
+			if(len == depth) {
+				depth *= 2;
+				info = realloc(info, sizeof(Info) * depth);
+				for(int m=0; m<len; m++)
+					info[m].offset = realloc(info[m].offset, sizeof(int) * offset_depth);
+			}
+			if(offset_count == offset_depth) {
+				offset_depth *= 2;
+				info[len].offset = realloc(info[len].offset, sizeof(int) * offset_depth);
+			}
+			info[len].offset[offset_count] = row_offset - E.row[i].chars;
+			info[len].len = target_len; 	
+			info[len].rowidx = E.row[i].idx;
+			info[len].num++;
+			before_row_offset = row_offset;
+			row_offset = strstr(row_offset + strlen(org_str), org_str);
+			offset_count++;
+		}
+		len++;
+		offset_count = 0;
+	}
+	ret_rowoff = E.rowoff;
+	ret_coloff = E.coloff;
+//	printf("%d %d\n",len ,info[0].num); exit(1);
+	
+	for(int i=0; i<len; i++) {
+		if(!info[i].num)
+			continue;
+		for(int k=0; k<info[i].num; k++) {
+			for(int j=0; j<info[i].len; j++) {	
+				int diff;
+		//		printf("%d", info[i].offset[k] ); exit(1);
+				E.cx = info[i].offset[k] + info[i].len - j;
+				E.cy = info[i].rowidx;
+				E.coloff = E.rowoff = 0;
+				if(E.cx > E.screencols) { 
+					diff = E.cx - E.screencols;
+					E.coloff += diff;
+					E.cx -= diff;
+				}
+				if(E.cy > E.screenrows) {
+					diff = E.cy - E.screenrows;
+					E.rowoff += diff;
+					E.cy -= diff;
+				}
+				editorDelChar();	
+			}	
+			for(int j=0; j<target_len; j++) {
+				editorInsertChar(target[j]);
+			}
+		}
+	}
+	E.cx = ret_cx;
+	E.cy = ret_cy;
+	E.rowoff = ret_rowoff;
+	E.coloff = ret_coloff;
+	editorSetStatusMessage("Replace is completed!");
+	editorRefreshScreen();
+}
+
+
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
 #define KILO_QUIT_TIMES 2
@@ -1473,6 +1601,9 @@ void editorProcessKeypress(int fd) {
 		break;
 	case CTRL_X:
 		removeOneLine();
+		break;
+	case CTRL_P:
+		replace();
 		break;
 	case CTRL_Z:
 		undo();
@@ -1646,6 +1777,7 @@ void initEditor(void) {
     }
     E.screenrows -= 2; /* Get room for status bar. */
 }
+
 
 int main(int argc, char **argv) {
     if (argc != 2) {
