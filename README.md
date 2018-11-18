@@ -18,4 +18,5 @@ Keys:
 	CTRL-X: Remove one line
 	CTRL-P: Replace from original string to what you want to replace it
 	CTRL-Z: Undo
+	.kilorc: Editor configuration file
 
