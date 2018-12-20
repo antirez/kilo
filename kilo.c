@@ -133,6 +133,8 @@ enum KEY_ACTION{
         TAB = 9,            /* Tab */
         CTRL_L = 12,        /* Ctrl+l */
         ENTER = 13,         /* Enter */
+		CTRL_N = 14,	    /* CTRL_N : display row index number*/
+		CTRL_O = 15, 		/* HELP*/
         CTRL_Q = 17,        /* Ctrl-q */
         CTRL_S = 19,        /* Ctrl-s */
         CTRL_U = 21,        /* Ctrl-u */
@@ -153,6 +155,8 @@ enum KEY_ACTION{
         PAGE_DOWN
 };
 
+int displayNumberFlag=0;
+int helpFlag = 0;
 void editorSetStatusMessage(const char *fmt, ...);
 
 /* =========================== Syntax highlights DB =========================
@@ -1148,25 +1152,56 @@ void editorRefreshScreen(void) {
 	for (y = 0; y < E.screenrows; y++) {
         int filerow = E.rowoff+y;
 
-        if (filerow >= E.numrows) {
-            if (E.numrows == 0 && y == E.screenrows/3) {
-                char welcome[100];
-                int welcomelen = snprintf(welcome,sizeof(welcome),
-                    "Hyunsoo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
-                int padding = (E.screencols-welcomelen)/2;
-                if (padding) {
-                    abAppend(&ab,"~",1);
-                    padding--;
-                }
-                while(padding--) abAppend(&ab," ",1);
-                abAppend(&ab,welcome,welcomelen);
+        if (filerow >= E.numrows || helpFlag) {
+            if ((E.numrows == 0 ||helpFlag )&& y == E.screenrows/3) {
+               //welcome msg
+				char welcome[80];
+			    int welcomelen = snprintf(welcome,sizeof(welcome),"Kilo Editor -- 2018 SP Project HyunSoo,Shin / HyunWook, Hong\r\n");
+			    int padding = (E.screencols-welcomelen)/3;
+			    if (padding) {
+			        abAppend(&ab,"?",1);
+			        padding--;
+			    }
+			    while(padding--) abAppend(&ab," ",1);
+			    abAppend(&ab,"\x1b[33m",5);	
+			    abAppend(&ab,welcome,welcomelen);
+			    //introduce function
+			    char function[15][80]={"\x1b[7mFUNCTIONS\x1b[27m forked from antirez/kilo\r\n",
+			    					   "\x1b[7mCTRL-S\x1b[27m: Save\r\n","\x1b[7mCTRL-Q\x1b[27m: Quit\r\n","\x1b[7mCTRL-F\x1b[27m: Find string in file (ESC to exit search, arrows to navigate)\r\n",
+			    					   "\x1b[7mEXTENTION\x1b[27m\r\n",
+			    					   "\x1b[7mCTRL-C\x1b[27m: Copy one line\r\n","\x1b[7mCTRL-V\x1b[27m: Paste one line\r\n","\x1b[7mCTRL-G\x1b[27m: Move to end of currnet line\r\n",
+			    					   "\x1b[7mCTRL-T\x1b[27m: Move to first of current line\r\n","\x1b[7mCTRL-P\x1b[27m: Replace from original string to what you want to replace it\r\n",
+									   "\x1b[7mCTRL-Z\x1b[27m: Undo\r\n","\x1b[7mCTRL-D\x1b[27m: Move to end of file\r\n","\x1b[7mCTRL-X\x1b[27m: Remove one line\r\n",
+			   				 		   "\x1b[7mCTRL-N\x1b[27m: display row numbers\r\n","\x1b[7mCTRL-O\x1b[27m: Help, Re-display the document you are reading currently\r\n"};
+			    for(int i=0;i<15;++i){
+			    	int padding = (E.screencols-welcomelen)/3;
+			    	if (padding) {
+			        abAppend(&ab,"?",1);
+			        padding--;
+				    }
+				    while(padding--) abAppend(&ab," ",1);
+				    abAppend(&ab,function[i],strlen(function[i]));
+				}
+				abAppend(&ab,"\x1b[0m",4); //컬러 해제
+
             } else {
                 abAppend(&ab,"~\x1b[0K\r\n",7);
             }
             continue;
         }
 
-        r = &E.row[filerow];
+        //filerow < E.numrows)
+        r = &E.row[filerow]; //현재 해당하는 줄의 row불러오기
+
+        //display row Number when CTRL_N was pressed
+        if(displayNumberFlag){
+        	char curRow[6];
+        	snprintf(curRow,sizeof(curRow),"%d ",filerow);
+        	abAppend(&ab,"\x1b[36m",5);
+        	abAppend(&ab,curRow,strlen(curRow));	
+        	abAppend(&ab,"\x1b[0m",4); //컬러 해제
+        }
+        
 
         int len = r->rsize - E.coloff;
         int current_color = -1;
@@ -1212,7 +1247,7 @@ void editorRefreshScreen(void) {
     abAppend(&ab,"\x1b[0K",4);
     abAppend(&ab,"\x1b[7m",4);
     char status[80], rstatus[80];
-    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
+    int len = snprintf(status, sizeof(status), "FILENAME : %.20s - %d lines %s",
         E.filename, E.numrows, E.dirty ? "(modified)" : "");
     int rlen = snprintf(rstatus, sizeof(rstatus),
         "%d/%d",E.rowoff+E.cy+1,E.numrows);
@@ -1658,6 +1693,26 @@ void editorProcessKeypress(int fd) {
     case CTRL_L: /* ctrl+l, clear screen */
         /* Just refresht the line as side effect. */
         break;
+    case CTRL_N:
+		if(displayNumberFlag){
+			displayNumberFlag = 0;
+			editorSetStatusMessage("set number off");
+		} 
+		else{
+			displayNumberFlag = 1;	
+			editorSetStatusMessage("set number on");
+		} 
+		break;
+	case CTRL_O:
+		if(helpFlag){
+			helpFlag = 0;
+			editorSetStatusMessage("show help off");
+		} 
+		else{
+			helpFlag = 1;	
+			editorSetStatusMessage("show help on");
+		} 	
+		break;
     case ESC:
         /* Nothing to do for ESC in this mode. */
         break;
@@ -1724,7 +1779,8 @@ void initEditor(void) {
     E.dirty = 0;
     E.filename = NULL;
     E.syntax = NULL;
-
+    displayNumberFlag = 0;
+    helpFlag = 0;
 	FILE* fp;
 	char str[100];
 	char type[100];
@@ -1791,8 +1847,7 @@ int main(int argc, char **argv) {
     editorSelectSyntaxHighlight(argv[1]);
     editorOpen(argv[1]);
     enableRawMode(STDIN_FILENO);
-    editorSetStatusMessage(
-        "HELP: Ctrl-S = save | Ctrl-Q = quit | See the README.md for other functions");
+    editorSetStatusMessage("if you want HELP Message, Please press CTRL_O button");
     while(1) {
         editorRefreshScreen();
         editorProcessKeypress(STDIN_FILENO);
