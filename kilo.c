@@ -1167,6 +1167,17 @@ void editorMoveCursor(int key) {
             }
         }
         break;
+    case HOME_KEY:
+        E.cx = 0;
+        E.coloff = 0;
+        break;
+    case END_KEY:
+        E.cx = E.row[filerow].size;
+        if (E.cx > E.screencols-1) {
+            E.coloff = E.cx-E.screencols+1;
+            E.cx = E.screencols-1;
+        }
+        break;
     }
     /* Fix cx if the current line has not enough chars. */
     filerow = E.rowoff+E.cy;
@@ -1233,7 +1244,8 @@ void editorProcessKeypress(int fd) {
                                             ARROW_DOWN);
         }
         break;
-
+    case HOME_KEY:
+    case END_KEY:
     case ARROW_UP:
     case ARROW_DOWN:
     case ARROW_LEFT:
