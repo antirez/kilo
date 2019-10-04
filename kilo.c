@@ -1244,8 +1244,7 @@ void initEditor(void) {
     E.filename = NULL;
     E.syntax = NULL;
     if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
-                      &E.screenrows,&E.screencols) == -1)
-    {
+                      &E.screenrows,&E.screencols) == -1){
         perror("Unable to query the screen for size (columns / rows)");
         exit(1);
     }
