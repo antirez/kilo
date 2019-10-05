@@ -87,7 +87,7 @@ typedef struct erow {
 } erow;
 
 typedef struct hlcolor {
-    int r, g, b;
+	int r, g, b;
 } hlcolor;
 
 struct editorConfig {
