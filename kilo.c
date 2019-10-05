@@ -36,6 +36,7 @@
 
 #define _BSD_SOURCE
 #define _GNU_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <termios.h>
 #include <stdlib.h>
@@ -50,6 +51,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <time.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -87,7 +89,7 @@ typedef struct erow {
 } erow;
 
 typedef struct hlcolor {
-    int r,g,b;
+	int r, g, b;
 } hlcolor;
 
 struct editorConfig {
@@ -1244,8 +1246,7 @@ void initEditor(void) {
     E.filename = NULL;
     E.syntax = NULL;
     if (getWindowSize(STDIN_FILENO,STDOUT_FILENO,
-                      &E.screenrows,&E.screencols) == -1)
-    {
+                      &E.screenrows,&E.screencols) == -1){
         perror("Unable to query the screen for size (columns / rows)");
         exit(1);
     }
