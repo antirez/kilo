@@ -36,6 +36,7 @@
 
 #define _BSD_SOURCE
 #define _GNU_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <termios.h>
 #include <stdlib.h>
@@ -50,6 +51,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <time.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
