@@ -469,8 +469,12 @@ void editorUpdateSyntax(erow *row) {
             int j;
             for (j = 0; keywords[j]; j++) {
                 int klen = strlen(keywords[j]);
+                int rlen = row->rsize - (p - row->render);
                 int kw2 = keywords[j][klen-1] == '|';
                 if (kw2) klen--;
+
+                if (rlen < klen)
+                    continue;
 
                 if (!memcmp(p,keywords[j],klen) &&
                     is_separator(*(p+klen)))
