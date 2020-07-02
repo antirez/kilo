@@ -34,6 +34,14 @@
 
 #define KILO_VERSION "0.0.1"
 
+#ifdef __APPLE__
+#include <AvailabilityMacros.h>
+#endif
+
+#ifdef __linux__
+#include <features.h>
+#endif
+
 #ifdef __GLIBC__
 #define _POSIX_C_SOURCE 200809L
 #endif
