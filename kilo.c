@@ -553,13 +553,21 @@ void editorSelectSyntaxHighlight(char *filename) {
 
 /* Update the rendered version and the syntax highlight of a row. */
 void editorUpdateRow(erow *row) {
-    int tabs = 0, nonprint = 0, j, idx;
+    unsigned int tabs = 0, nonprint = 0;
+    int j, idx;
 
    /* Create a version of the row we can directly print on the screen,
      * respecting tabs, substituting non printable characters with '?'. */
     free(row->render);
     for (j = 0; j < row->size; j++)
         if (row->chars[j] == TAB) tabs++;
+
+    unsigned long long allocsize =
+        (unsigned long long) row->size + tabs*8 + nonprint*9 + 1;
+    if (allocsize > UINT32_MAX) {
+        printf("Some line of the edited file is too long for kilo\n");
+        exit(1);
+    }
 
     row->render = malloc(row->size + tabs*8 + nonprint*9 + 1);
     idx = 0;
