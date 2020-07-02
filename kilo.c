@@ -790,7 +790,9 @@ int editorOpen(char *filename) {
 
     E.dirty = 0;
     free(E.filename);
-    E.filename = strdup(filename);
+    size_t fnlen = strlen(filename)+1;
+    E.filename = malloc(fnlen);
+    memcpy(E.filename,filename,fnlen);
 
     fp = fopen(filename,"r");
     if (!fp) {
