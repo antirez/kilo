@@ -550,6 +550,14 @@ void editorSelectSyntaxHighlight(char *filename) {
     }
 }
 
+
+void clearScreen() //define the function to clear the screen after exiting the editor
+{
+  const char *CLEAR_SCREEN_ANSI = "\e[1;1H\e[2J";
+  write(STDOUT_FILENO, CLEAR_SCREEN_ANSI, 12);
+}
+
+
 /* ======================= Editor rows implementation ======================= */
 
 /* Update the rendered version and the syntax highlight of a row. */
@@ -1207,6 +1215,7 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        clearScreen();
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
