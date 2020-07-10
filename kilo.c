@@ -212,6 +212,7 @@ void disableRawMode(int fd) {
 /* Called at exit to avoid remaining in raw mode. */
 void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
+    printf("\033[2J\033[1;1H");
 }
 
 /* Raw mode: 1960 magic shit. */
