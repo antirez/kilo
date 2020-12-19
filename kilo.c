@@ -460,7 +460,7 @@ void editorUpdateSyntax(erow *row) {
         /* Handle "" and '' */
         if (in_string) {
             row->hl[i] = HL_STRING;
-            if (*p == '\\') {
+            if (*p == '\\' && *(p+1)) {
                 row->hl[i+1] = HL_STRING;
                 p += 2; i += 2;
                 prev_sep = 0;
