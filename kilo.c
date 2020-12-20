@@ -385,16 +385,6 @@ int is_separator(int c) {
     return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];:",c) != NULL;
 }
 
-/* Return true if the specified row last char is part of a multi line comment
- * that starts at this row or at one before, and does not end at the end
- * of the row but spawns to the next row. */
-int editorRowHasOpenComment(erow *row) {
-    if (row->hl && row->rsize && row->hl[row->rsize-1] == HL_MLCOMMENT &&
-        (row->rsize < 2 || (row->render[row->rsize-2] != '*' ||
-                            row->render[row->rsize-1] != '/'))) return 1;
-    return 0;
-}
-
 /* Set every byte of row->hl (that corresponds to every character in the line)
  * to the right syntax highlight type (HL_* defines). */
 void editorUpdateSyntax(erow *row) {
@@ -423,8 +413,7 @@ void editorUpdateSyntax(erow *row) {
 
     /* If the previous line has an open comment, this line starts
      * with an open comment state. */
-    if (row->idx > 0 && editorRowHasOpenComment(&E.row[row->idx-1]))
-        in_comment = 1;
+    if (row->idx > 0) in_comment = E.row[row->idx-1].hl_oc;
 
     while(*p) {
         /* Handle // comments. */
@@ -526,13 +515,15 @@ void editorUpdateSyntax(erow *row) {
         p++; i++;
     }
 
-    /* Propagate syntax change to the next row if the open commen
+    /* Propagate syntax change to the next row if the open comment
      * state changed. This may recursively affect all the following rows
      * in the file. */
-    int oc = editorRowHasOpenComment(row);
-    if (row->hl_oc != oc && row->idx+1 < E.numrows)
-        editorUpdateSyntax(&E.row[row->idx+1]);
-    row->hl_oc = oc;
+    if (!!row->hl_oc != !!in_comment) {
+        row->hl_oc = in_comment;
+        if (row->idx+1 < E.numrows)
+            editorUpdateSyntax(&E.row[row->idx+1]);
+    }
+
 }
 
 /* Maps syntax highlight token types to terminal colors. */
