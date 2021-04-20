@@ -208,7 +208,7 @@ struct editorSyntax HLDB[] = {
     {
         PY_HL_extensions,
         PY_HL_keywords,
-        "#","\"\"\"", "\"\"\"",
+        "#","\0\0\0", "\0\0\0",
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
     },
 };
