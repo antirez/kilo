@@ -768,36 +768,54 @@ fixcursor:
 }
 
 /* Delete the char at the current prompt position. */
-void editorDelChar() {
+void editorDelChar(int back) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    if (filerow >= E.numrows) return;
 
-    if (!row || (filecol == 0 && filerow == 0)) return;
-    if (filecol == 0) {
-        /* Handle the case of column 0, we need to move the current line
-         * on the right of the previous one. */
-        filecol = E.row[filerow-1].size;
-        editorRowAppendString(&E.row[filerow-1],row->chars,row->size);
-        editorDelRow(filerow);
-        row = NULL;
-        if (E.cy == 0)
-            E.rowoff--;
-        else
-            E.cy--;
-        E.cx = filecol;
-        if (E.cx >= E.screencols) {
-            int shift = (E.screencols-E.cx)+1;
-            E.cx -= shift;
-            E.coloff += shift;
+    erow *row = &E.row[filerow];
+
+    if (back) {
+        if (filecol == 0 && filerow == 0) return;
+        if (back && filecol == 0) {
+            /* Handle the case of column 0, we need to move the current line
+             * on the right of the previous one. */
+            filecol = E.row[filerow-1].size;
+            editorRowAppendString(&E.row[filerow-1],row->chars,row->size);
+            editorDelRow(filerow);
+            row = NULL;
+            if (E.cy == 0)
+                E.rowoff--;
+            else
+                E.cy--;
+            E.cx = filecol;
+            if (E.cx >= E.screencols) {
+                int shift = (E.screencols-E.cx)+1;
+                E.cx -= shift;
+                E.coloff += shift;
+            }
+        } else {
+            editorRowDelChar(row,filecol-1);
+            if (E.cx == 0 && E.coloff)
+                E.coloff--;
+            else
+                E.cx--;
         }
     } else {
-        editorRowDelChar(row,filecol-1);
-        if (E.cx == 0 && E.coloff)
-            E.coloff--;
-        else
-            E.cx--;
+        /* not backspace */
+        if (filerow == E.numrows-1 && filecol >= row->size) return;
+
+        if (filecol == row->size) {
+            /* Handle the case of last column, we need to delete the newline on the end of line */
+            erow *nextrow = (filerow + 1 >= E.numrows) ? NULL : &E.row[filerow + 1];
+            editorRowAppendString(&E.row[filerow],nextrow->chars,nextrow->size);
+            editorDelRow(filerow + 1);
+            row = NULL;
+        } else {
+            editorRowDelChar(row,filecol);
+        }
     }
+
     if (row) editorUpdateRow(row);
     E.dirty++;
 }
@@ -1238,8 +1256,10 @@ void editorProcessKeypress(int fd) {
         break;
     case BACKSPACE:     /* Backspace */
     case CTRL_H:        /* Ctrl-h */
+        editorDelChar(1);
+        break;
     case DEL_KEY:
-        editorDelChar();
+        editorDelChar(0);
         break;
     case PAGE_UP:
     case PAGE_DOWN:
