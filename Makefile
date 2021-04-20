@@ -1,3 +1,5 @@
+-include config.mak
+
 all: kilo
 
 kilo: kilo.c
