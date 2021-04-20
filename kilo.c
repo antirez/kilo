@@ -427,8 +427,8 @@ void editorUpdateSyntax(erow *row) {
         if (in_comment) {
             row->hl[i] = HL_MLCOMMENT;
             if (*p == mce[0] && *(p+1) == mce[1] && (!mce[2] || *(p+2) == mce[2])) {
-                row->hl[i+1] = HL_MLCOMMENT;
-                p += 2; i += 2;
+                for(++i,++p;mce[i];++i,++p)
+                    row->hl[i] = HL_MLCOMMENT;
                 in_comment = 0;
                 prev_sep = 1;
                 continue;
@@ -438,9 +438,8 @@ void editorUpdateSyntax(erow *row) {
                 continue;
             }
         } else if (*p == mcs[0] && *(p+1) == mcs[1] && (!mce[2] || *(p+2) == mce[2])) {
-            row->hl[i] = HL_MLCOMMENT;
-            row->hl[i+1] = HL_MLCOMMENT;
-            p += 2; i += 2;
+            for(;mce[i];++i,++p)
+                row->hl[i] = HL_MLCOMMENT;
             in_comment = 1;
             prev_sep = 0;
             continue;
