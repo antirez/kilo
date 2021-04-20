@@ -382,7 +382,7 @@ failed:
 /* ====================== Syntax highlight color scheme  ==================== */
 
 int is_separator(int c) {
-    return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];",c) != NULL;
+    return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];:",c) != NULL;
 }
 
 /* Return true if the specified row last char is part of a multi line comment
