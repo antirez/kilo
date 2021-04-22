@@ -1,0 +1,7 @@
+- long lines with tabs in them aren't correctly rendered when editing the part
+  outside of the boundaries of the editor windows (i.e. when scrolled to the right.)
+  a patch of dirkf exists, however it's way too intrusive, and actually doesn't even
+  work correctly.
+- if cursor is moved outside the visible bounds of a long line, the new code
+  to optimize screen redraw doesn't properly detect that the screen needs redraw
+
