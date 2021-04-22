@@ -904,16 +904,75 @@ void abFree(struct abuf *ab) {
     free(ab->b);
 }
 
+static void hideCursor(struct abuf *ab) {
+    abAppend(ab,"\x1b[?25l",6); /* Hide cursor. */
+    abAppend(ab,"\x1b[H",3); /* Go home. */
+}
+
+static void setCursor(struct abuf *ab) {
+    /* Put cursor at its current position. Note that the horizontal position
+     * at which the cursor is displayed may be different compared to 'E.cx'
+     * because of TABs. */
+    int j;
+    int cx = 1;
+    int filerow = E.rowoff+E.cy;
+    char buf[32];
+
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    if (row) {
+        for (j = E.coloff; j < (E.cx+E.coloff); j++) {
+            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
+            cx++;
+        }
+    }
+    snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,cx);
+    abAppend(ab,buf,strlen(buf));
+    abAppend(ab,"\x1b[?25h",6); /* Show cursor. */
+}
+
+static void setStatus(struct abuf *ab, int putcursor) {
+    if(putcursor) {
+        char buf[32];
+        snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.screenrows+1,0);
+        abAppend(ab,buf,strlen(buf));
+    }
+    /* Create a two rows status. First row: */
+    abAppend(ab,"\x1b[0K",4);
+    abAppend(ab,"\x1b[7m",4);
+    char status[80], rstatus[80];
+    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
+        E.filename, E.numrows, E.dirty ? "(modified)" : "");
+    int rlen = snprintf(rstatus, sizeof(rstatus),
+        "%d/%d",E.rowoff+E.cy+1,E.numrows);
+    if (len > E.screencols) len = E.screencols;
+    abAppend(ab,status,len);
+    while(len < E.screencols) {
+        if (E.screencols - len == rlen) {
+            abAppend(ab,rstatus,rlen);
+            break;
+        } else {
+            abAppend(ab," ",1);
+            len++;
+        }
+    }
+    abAppend(ab,"\x1b[0m\r\n",6);
+
+    /* Second row depends on E.statusmsg and the status message update time. */
+    abAppend(ab,"\x1b[0K",4);
+    int msglen = strlen(E.statusmsg);
+    if (msglen && time(NULL)-E.statusmsg_time < 5)
+        abAppend(ab,E.statusmsg,msglen <= E.screencols ? msglen : E.screencols);
+}
+
 /* This function writes the whole screen using VT100 escape characters
  * starting from the logical state of the editor in the global state 'E'. */
 void editorRefreshScreen(void) {
     int y;
     erow *r;
-    char buf[32];
     struct abuf ab = ABUF_INIT;
 
-    abAppend(&ab,"\x1b[?25l",6); /* Hide cursor. */
-    abAppend(&ab,"\x1b[H",3); /* Go home. */
+    hideCursor(&ab);
+
     for (y = 0; y < E.screenrows; y++) {
         int filerow = E.rowoff+y;
 
@@ -977,49 +1036,8 @@ void editorRefreshScreen(void) {
         abAppend(&ab,"\r\n",2);
     }
 
-    /* Create a two rows status. First row: */
-    abAppend(&ab,"\x1b[0K",4);
-    abAppend(&ab,"\x1b[7m",4);
-    char status[80], rstatus[80];
-    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
-        E.filename, E.numrows, E.dirty ? "(modified)" : "");
-    int rlen = snprintf(rstatus, sizeof(rstatus),
-        "%d/%d",E.rowoff+E.cy+1,E.numrows);
-    if (len > E.screencols) len = E.screencols;
-    abAppend(&ab,status,len);
-    while(len < E.screencols) {
-        if (E.screencols - len == rlen) {
-            abAppend(&ab,rstatus,rlen);
-            break;
-        } else {
-            abAppend(&ab," ",1);
-            len++;
-        }
-    }
-    abAppend(&ab,"\x1b[0m\r\n",6);
-
-    /* Second row depends on E.statusmsg and the status message update time. */
-    abAppend(&ab,"\x1b[0K",4);
-    int msglen = strlen(E.statusmsg);
-    if (msglen && time(NULL)-E.statusmsg_time < 5)
-        abAppend(&ab,E.statusmsg,msglen <= E.screencols ? msglen : E.screencols);
-
-    /* Put cursor at its current position. Note that the horizontal position
-     * at which the cursor is displayed may be different compared to 'E.cx'
-     * because of TABs. */
-    int j;
-    int cx = 1;
-    int filerow = E.rowoff+E.cy;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
-    if (row) {
-        for (j = E.coloff; j < (E.cx+E.coloff); j++) {
-            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
-            cx++;
-        }
-    }
-    snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,cx);
-    abAppend(&ab,buf,strlen(buf));
-    abAppend(&ab,"\x1b[?25h",6); /* Show cursor. */
+    setStatus(&ab,0);
+    setCursor(&ab);
     write(STDOUT_FILENO,ab.b,ab.len);
     abFree(&ab);
 }
@@ -1221,12 +1239,16 @@ void editorMoveCursor(int key) {
 }
 
 /* Process events arriving from the standard input, which is, the user
- * is typing stuff on the terminal. */
+ * is typing stuff on the terminal.
+ * If return value is 0, only cursor position needs to be updated,
+ * else the entire screen.
+ */
 #define KILO_QUIT_TIMES 3
-void editorProcessKeypress(int fd) {
+int editorProcessKeypress(int fd) {
     /* When the file is modified, requires Ctrl-q to be pressed N times
      * before actually quitting. */
     static int quit_times = KILO_QUIT_TIMES;
+    int ret = 1;
 
     int c = editorReadKey(fd);
     switch(c) {
@@ -1243,7 +1265,7 @@ void editorProcessKeypress(int fd) {
             editorSetStatusMessage("WARNING!!! File has unsaved changes. "
                 "Press Ctrl-Q %d more times to quit.", quit_times);
             quit_times--;
-            return;
+            return ret;
         }
         exit(0);
         break;
@@ -1279,7 +1301,10 @@ void editorProcessKeypress(int fd) {
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
+        ret = E.rowoff;
         editorMoveCursor(c);
+        ret = (ret != E.rowoff);
+        if(!ret) ret = (E.coloff >= E.screencols);
         break;
     case CTRL_L: /* ctrl+l, clear screen */
         /* Just refresht the line as side effect. */
@@ -1293,6 +1318,7 @@ void editorProcessKeypress(int fd) {
     }
 
     quit_times = KILO_QUIT_TIMES; /* Reset it to the original value. */
+    return ret;
 }
 
 int editorFileWasModified(void) {
@@ -1341,9 +1367,19 @@ int main(int argc, char **argv) {
     enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+
+    editorRefreshScreen();
     while(1) {
-        editorRefreshScreen();
-        editorProcessKeypress(STDIN_FILENO);
+        if(!editorProcessKeypress(STDIN_FILENO)) {
+            /* only cursor moved, no need to repain entire screen */
+            struct abuf ab = ABUF_INIT;
+            hideCursor(&ab);
+            setStatus(&ab,1);
+            setCursor(&ab);
+            write(STDOUT_FILENO,ab.b,ab.len);
+            abFree(&ab);
+        } else
+            editorRefreshScreen();
     }
     return 0;
 }
