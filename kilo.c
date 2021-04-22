@@ -183,6 +183,18 @@ char *C_HL_keywords[] = {
         "void|","short|","auto|","const|","bool|",NULL
 };
 
+ /* python */
+char *PY_HL_extensions[] = {".py","python",NULL};
+char *PY_HL_keywords[] = {
+        "def","if","while","for","break","return","continue","else","elif",
+        "import","try","except","in","and","or","is","not","with","as",
+        "True","False","None","class",
+        /* Python types */
+        "int|","str|","unicode|","dict|","float|","repr|","long|","eval|",
+        "tuple|","list|","set|","frozenset|","chr|","unichr|","ord|","hex|",
+        NULL
+};
+
 /* Here we define an array of syntax highlights by extensions, keywords,
  * comments delimiters and flags. */
 struct editorSyntax HLDB[] = {
@@ -192,7 +204,13 @@ struct editorSyntax HLDB[] = {
         C_HL_keywords,
         "//","/*","*/",
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
-    }
+    },
+    {
+        PY_HL_extensions,
+        PY_HL_keywords,
+        "#","\0\0\0", "\0\0\0",
+        HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
+    },
 };
 
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
@@ -364,17 +382,7 @@ failed:
 /* ====================== Syntax highlight color scheme  ==================== */
 
 int is_separator(int c) {
-    return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];",c) != NULL;
-}
-
-/* Return true if the specified row last char is part of a multi line comment
- * that starts at this row or at one before, and does not end at the end
- * of the row but spawns to the next row. */
-int editorRowHasOpenComment(erow *row) {
-    if (row->hl && row->rsize && row->hl[row->rsize-1] == HL_MLCOMMENT &&
-        (row->rsize < 2 || (row->render[row->rsize-2] != '*' ||
-                            row->render[row->rsize-1] != '/'))) return 1;
-    return 0;
+    return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];:",c) != NULL;
 }
 
 /* Set every byte of row->hl (that corresponds to every character in the line)
@@ -405,23 +413,22 @@ void editorUpdateSyntax(erow *row) {
 
     /* If the previous line has an open comment, this line starts
      * with an open comment state. */
-    if (row->idx > 0 && editorRowHasOpenComment(&E.row[row->idx-1]))
-        in_comment = 1;
+    if (row->idx > 0) in_comment = E.row[row->idx-1].hl_oc;
 
     while(*p) {
         /* Handle // comments. */
-        if (prev_sep && *p == scs[0] && *(p+1) == scs[1]) {
+        if (!in_comment && prev_sep && *p == scs[0] && (!scs[1] || *(p+1) == scs[1])) {
             /* From here to end is a comment */
-            memset(row->hl+i,HL_COMMENT,row->size-i);
+            memset(row->hl+i,HL_COMMENT,row->rsize-i);
             return;
         }
 
         /* Handle multi line comments. */
         if (in_comment) {
             row->hl[i] = HL_MLCOMMENT;
-            if (*p == mce[0] && *(p+1) == mce[1]) {
-                row->hl[i+1] = HL_MLCOMMENT;
-                p += 2; i += 2;
+            if (*p == mce[0] && *(p+1) == mce[1] && (!mce[2] || *(p+2) == mce[2])) {
+                for(++i,++p;i<row->rsize&&mce[i];++i,++p)
+                    row->hl[i] = HL_MLCOMMENT;
                 in_comment = 0;
                 prev_sep = 1;
                 continue;
@@ -430,10 +437,9 @@ void editorUpdateSyntax(erow *row) {
                 p++; i++;
                 continue;
             }
-        } else if (*p == mcs[0] && *(p+1) == mcs[1]) {
-            row->hl[i] = HL_MLCOMMENT;
-            row->hl[i+1] = HL_MLCOMMENT;
-            p += 2; i += 2;
+        } else if (*p == mcs[0] && *(p+1) == mcs[1] && (!mce[2] || *(p+2) == mce[2])) {
+            for(;i<row->rsize&&mce[i];++i,++p)
+                row->hl[i] = HL_MLCOMMENT;
             in_comment = 1;
             prev_sep = 0;
             continue;
@@ -442,7 +448,7 @@ void editorUpdateSyntax(erow *row) {
         /* Handle "" and '' */
         if (in_string) {
             row->hl[i] = HL_STRING;
-            if (*p == '\\') {
+            if (*p == '\\' && *(p+1)) {
                 row->hl[i+1] = HL_STRING;
                 p += 2; i += 2;
                 prev_sep = 0;
@@ -481,12 +487,13 @@ void editorUpdateSyntax(erow *row) {
         /* Handle keywords and lib calls */
         if (prev_sep) {
             int j;
+	    int ileft = row->rsize - i;
             for (j = 0; keywords[j]; j++) {
                 int klen = strlen(keywords[j]);
                 int kw2 = keywords[j][klen-1] == '|';
                 if (kw2) klen--;
 
-                if (!memcmp(p,keywords[j],klen) &&
+                if (klen < ileft && !memcmp(p,keywords[j],klen) &&
                     is_separator(*(p+klen)))
                 {
                     /* Keyword */
@@ -507,13 +514,15 @@ void editorUpdateSyntax(erow *row) {
         p++; i++;
     }
 
-    /* Propagate syntax change to the next row if the open commen
+    /* Propagate syntax change to the next row if the open comment
      * state changed. This may recursively affect all the following rows
      * in the file. */
-    int oc = editorRowHasOpenComment(row);
-    if (row->hl_oc != oc && row->idx+1 < E.numrows)
-        editorUpdateSyntax(&E.row[row->idx+1]);
-    row->hl_oc = oc;
+    if (!!row->hl_oc != !!in_comment) {
+        row->hl_oc = in_comment;
+        if (row->idx+1 < E.numrows)
+            editorUpdateSyntax(&E.row[row->idx+1]);
+    }
+
 }
 
 /* Maps syntax highlight token types to terminal colors. */
@@ -758,36 +767,54 @@ fixcursor:
 }
 
 /* Delete the char at the current prompt position. */
-void editorDelChar() {
+void editorDelChar(int back) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    if (filerow >= E.numrows) return;
 
-    if (!row || (filecol == 0 && filerow == 0)) return;
-    if (filecol == 0) {
-        /* Handle the case of column 0, we need to move the current line
-         * on the right of the previous one. */
-        filecol = E.row[filerow-1].size;
-        editorRowAppendString(&E.row[filerow-1],row->chars,row->size);
-        editorDelRow(filerow);
-        row = NULL;
-        if (E.cy == 0)
-            E.rowoff--;
-        else
-            E.cy--;
-        E.cx = filecol;
-        if (E.cx >= E.screencols) {
-            int shift = (E.screencols-E.cx)+1;
-            E.cx -= shift;
-            E.coloff += shift;
+    erow *row = &E.row[filerow];
+
+    if (back) {
+        if (filecol == 0 && filerow == 0) return;
+        if (back && filecol == 0) {
+            /* Handle the case of column 0, we need to move the current line
+             * on the right of the previous one. */
+            filecol = E.row[filerow-1].size;
+            editorRowAppendString(&E.row[filerow-1],row->chars,row->size);
+            editorDelRow(filerow);
+            row = NULL;
+            if (E.cy == 0)
+                E.rowoff--;
+            else
+                E.cy--;
+            E.cx = filecol;
+            if (E.cx >= E.screencols) {
+                int shift = (E.screencols-E.cx)+1;
+                E.cx -= shift;
+                E.coloff += shift;
+            }
+        } else {
+            editorRowDelChar(row,filecol-1);
+            if (E.cx == 0 && E.coloff)
+                E.coloff--;
+            else
+                E.cx--;
         }
     } else {
-        editorRowDelChar(row,filecol-1);
-        if (E.cx == 0 && E.coloff)
-            E.coloff--;
-        else
-            E.cx--;
+        /* not backspace */
+        if (filerow == E.numrows-1 && filecol >= row->size) return;
+
+        if (filecol == row->size) {
+            /* Handle the case of last column, we need to delete the newline on the end of line */
+            erow *nextrow = (filerow + 1 >= E.numrows) ? NULL : &E.row[filerow + 1];
+            editorRowAppendString(&E.row[filerow],nextrow->chars,nextrow->size);
+            editorDelRow(filerow + 1);
+            row = NULL;
+        } else {
+            editorRowDelChar(row,filecol);
+        }
     }
+
     if (row) editorUpdateRow(row);
     E.dirty++;
 }
@@ -877,16 +904,75 @@ void abFree(struct abuf *ab) {
     free(ab->b);
 }
 
+static void hideCursor(struct abuf *ab) {
+    abAppend(ab,"\x1b[?25l",6); /* Hide cursor. */
+    abAppend(ab,"\x1b[H",3); /* Go home. */
+}
+
+static void setCursor(struct abuf *ab) {
+    /* Put cursor at its current position. Note that the horizontal position
+     * at which the cursor is displayed may be different compared to 'E.cx'
+     * because of TABs. */
+    int j;
+    int cx = 1;
+    int filerow = E.rowoff+E.cy;
+    char buf[32];
+
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    if (row) {
+        for (j = E.coloff; j < (E.cx+E.coloff); j++) {
+            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
+            cx++;
+        }
+    }
+    snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,cx);
+    abAppend(ab,buf,strlen(buf));
+    abAppend(ab,"\x1b[?25h",6); /* Show cursor. */
+}
+
+static void setStatus(struct abuf *ab, int putcursor) {
+    if(putcursor) {
+        char buf[32];
+        snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.screenrows+1,0);
+        abAppend(ab,buf,strlen(buf));
+    }
+    /* Create a two rows status. First row: */
+    abAppend(ab,"\x1b[0K",4);
+    abAppend(ab,"\x1b[7m",4);
+    char status[80], rstatus[80];
+    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
+        E.filename, E.numrows, E.dirty ? "(modified)" : "");
+    int rlen = snprintf(rstatus, sizeof(rstatus),
+        "%d/%d",E.rowoff+E.cy+1,E.numrows);
+    if (len > E.screencols) len = E.screencols;
+    abAppend(ab,status,len);
+    while(len < E.screencols) {
+        if (E.screencols - len == rlen) {
+            abAppend(ab,rstatus,rlen);
+            break;
+        } else {
+            abAppend(ab," ",1);
+            len++;
+        }
+    }
+    abAppend(ab,"\x1b[0m\r\n",6);
+
+    /* Second row depends on E.statusmsg and the status message update time. */
+    abAppend(ab,"\x1b[0K",4);
+    int msglen = strlen(E.statusmsg);
+    if (msglen && time(NULL)-E.statusmsg_time < 5)
+        abAppend(ab,E.statusmsg,msglen <= E.screencols ? msglen : E.screencols);
+}
+
 /* This function writes the whole screen using VT100 escape characters
  * starting from the logical state of the editor in the global state 'E'. */
 void editorRefreshScreen(void) {
     int y;
     erow *r;
-    char buf[32];
     struct abuf ab = ABUF_INIT;
 
-    abAppend(&ab,"\x1b[?25l",6); /* Hide cursor. */
-    abAppend(&ab,"\x1b[H",3); /* Go home. */
+    hideCursor(&ab);
+
     for (y = 0; y < E.screenrows; y++) {
         int filerow = E.rowoff+y;
 
@@ -950,49 +1036,8 @@ void editorRefreshScreen(void) {
         abAppend(&ab,"\r\n",2);
     }
 
-    /* Create a two rows status. First row: */
-    abAppend(&ab,"\x1b[0K",4);
-    abAppend(&ab,"\x1b[7m",4);
-    char status[80], rstatus[80];
-    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
-        E.filename, E.numrows, E.dirty ? "(modified)" : "");
-    int rlen = snprintf(rstatus, sizeof(rstatus),
-        "%d/%d",E.rowoff+E.cy+1,E.numrows);
-    if (len > E.screencols) len = E.screencols;
-    abAppend(&ab,status,len);
-    while(len < E.screencols) {
-        if (E.screencols - len == rlen) {
-            abAppend(&ab,rstatus,rlen);
-            break;
-        } else {
-            abAppend(&ab," ",1);
-            len++;
-        }
-    }
-    abAppend(&ab,"\x1b[0m\r\n",6);
-
-    /* Second row depends on E.statusmsg and the status message update time. */
-    abAppend(&ab,"\x1b[0K",4);
-    int msglen = strlen(E.statusmsg);
-    if (msglen && time(NULL)-E.statusmsg_time < 5)
-        abAppend(&ab,E.statusmsg,msglen <= E.screencols ? msglen : E.screencols);
-
-    /* Put cursor at its current position. Note that the horizontal position
-     * at which the cursor is displayed may be different compared to 'E.cx'
-     * because of TABs. */
-    int j;
-    int cx = 1;
-    int filerow = E.rowoff+E.cy;
-    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
-    if (row) {
-        for (j = E.coloff; j < (E.cx+E.coloff); j++) {
-            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
-            cx++;
-        }
-    }
-    snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,cx);
-    abAppend(&ab,buf,strlen(buf));
-    abAppend(&ab,"\x1b[?25h",6); /* Show cursor. */
+    setStatus(&ab,0);
+    setCursor(&ab);
     write(STDOUT_FILENO,ab.b,ab.len);
     abFree(&ab);
 }
@@ -1167,6 +1212,17 @@ void editorMoveCursor(int key) {
             }
         }
         break;
+    case HOME_KEY:
+        E.cx = 0;
+        E.coloff = 0;
+        break;
+    case END_KEY:
+        E.cx = E.row[filerow].size;
+        if (E.cx > E.screencols-1) {
+            E.coloff = E.cx-E.screencols+1;
+            E.cx = E.screencols-1;
+        }
+        break;
     }
     /* Fix cx if the current line has not enough chars. */
     filerow = E.rowoff+E.cy;
@@ -1183,12 +1239,16 @@ void editorMoveCursor(int key) {
 }
 
 /* Process events arriving from the standard input, which is, the user
- * is typing stuff on the terminal. */
+ * is typing stuff on the terminal.
+ * If return value is 0, only cursor position needs to be updated,
+ * else the entire screen.
+ */
 #define KILO_QUIT_TIMES 3
-void editorProcessKeypress(int fd) {
+int editorProcessKeypress(int fd) {
     /* When the file is modified, requires Ctrl-q to be pressed N times
      * before actually quitting. */
     static int quit_times = KILO_QUIT_TIMES;
+    int ret = 1;
 
     int c = editorReadKey(fd);
     switch(c) {
@@ -1205,7 +1265,7 @@ void editorProcessKeypress(int fd) {
             editorSetStatusMessage("WARNING!!! File has unsaved changes. "
                 "Press Ctrl-Q %d more times to quit.", quit_times);
             quit_times--;
-            return;
+            return ret;
         }
         exit(0);
         break;
@@ -1217,8 +1277,10 @@ void editorProcessKeypress(int fd) {
         break;
     case BACKSPACE:     /* Backspace */
     case CTRL_H:        /* Ctrl-h */
+        editorDelChar(1);
+        break;
     case DEL_KEY:
-        editorDelChar();
+        editorDelChar(0);
         break;
     case PAGE_UP:
     case PAGE_DOWN:
@@ -1233,12 +1295,16 @@ void editorProcessKeypress(int fd) {
                                             ARROW_DOWN);
         }
         break;
-
+    case HOME_KEY:
+    case END_KEY:
     case ARROW_UP:
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
+        ret = E.rowoff;
         editorMoveCursor(c);
+        ret = (ret != E.rowoff);
+        if(!ret) ret = (E.coloff >= E.screencols);
         break;
     case CTRL_L: /* ctrl+l, clear screen */
         /* Just refresht the line as side effect. */
@@ -1252,6 +1318,7 @@ void editorProcessKeypress(int fd) {
     }
 
     quit_times = KILO_QUIT_TIMES; /* Reset it to the original value. */
+    return ret;
 }
 
 int editorFileWasModified(void) {
@@ -1300,9 +1367,19 @@ int main(int argc, char **argv) {
     enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+
+    editorRefreshScreen();
     while(1) {
-        editorRefreshScreen();
-        editorProcessKeypress(STDIN_FILENO);
+        if(!editorProcessKeypress(STDIN_FILENO)) {
+            /* only cursor moved, no need to repain entire screen */
+            struct abuf ab = ABUF_INIT;
+            hideCursor(&ab);
+            setStatus(&ab,1);
+            setCursor(&ab);
+            write(STDOUT_FILENO,ab.b,ab.len);
+            abFree(&ab);
+        } else
+            editorRefreshScreen();
     }
     return 0;
 }
