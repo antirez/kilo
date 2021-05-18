@@ -639,6 +639,7 @@ void editorProcessKeypress(int fd) {
             }
             exit(0);
             break;
+
         case PAGE_UP:
         case PAGE_DOWN:
             if (c == PAGE_UP && E.cy != 0)
@@ -665,6 +666,17 @@ void editorProcessKeypress(int fd) {
         case ESC:
             /* Nothing to do for ESC in this mode. */
             break;
+
+        case '0':
+            E.cx = 0;
+            break;
+
+        case '$':
+            editorMoveCursor(ARROW_DOWN);
+            E.cx = 0;
+            editorMoveCursor(ARROW_LEFT);
+            break;
+
         default:
             break;
     }
