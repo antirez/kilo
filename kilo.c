@@ -791,7 +791,25 @@ void editorDelChar() {
     if (row) editorUpdateRow(row);
     E.dirty++;
 }
+void editorInvDelChar() {
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    erow *followingRow = (filerow+1 >= E.numrows) ? NULL : &E.row[filerow+1];
 
+    if (!row || (filecol == 0 && filerow == 0)) return;
+    if (filecol == row->size) {
+        /* Handle the case of last column, we need to move the following line
+         * on the right of the current one. */
+        editorRowAppendString(&E.row[filerow],followingRow->chars,followingRow->size);
+        editorDelRow(filerow+1);
+        row = NULL;
+    } else {
+        editorRowDelChar(row,filecol);
+    }
+    if (row) editorUpdateRow(row);
+    E.dirty++;
+}
 /* Load the specified program in the editor memory and returns 0 on success
  * or 1 on error. */
 int editorOpen(char *filename) {
@@ -1215,9 +1233,11 @@ void editorProcessKeypress(int fd) {
     case CTRL_F:
         editorFind(fd);
         break;
+    case DEL_KEY:
+        editorInvDelChar();
+        break;
     case BACKSPACE:     /* Backspace */
     case CTRL_H:        /* Ctrl-h */
-    case DEL_KEY:
         editorDelChar();
         break;
     case PAGE_UP:
