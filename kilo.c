@@ -1243,6 +1243,12 @@ void editorProcessKeypress(int fd) {
 	case CTRL_H:        /* Ctrl-h */
 		editorDelChar();
 		break;
+	case END_KEY:
+		E.cx = E.row[E.rowoff+E.cy].size;
+		break;
+	case HOME_KEY:
+		E.cx = 0;
+		break;
 	case PAGE_UP:
 	case PAGE_DOWN:
 		if (c == PAGE_UP && E.cy != 0)
