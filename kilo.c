@@ -32,27 +32,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define KILO_VERSION "0.0.1"
-
+// If compiling on a Linux system, define _POSIX_C_SOURCE to 200809L
 #ifdef __linux__
 #define _POSIX_C_SOURCE 200809L
 #endif
 
-#include <termios.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <errno.h>
-#include <string.h>
-#include <ctype.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/ioctl.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <fcntl.h>
-#include <signal.h>
+// Include standard C libraries
+#include <termios.h>    // Terminal input/output
+#include <stdlib.h>     // General utilities
+#include <stdio.h>      // Standard input/output
+#include <stdint.h>     // Integer types
+#include <errno.h>      // Error handling
+#include <string.h>     // String handling
+#include <ctype.h>      // Character handling
+#include <time.h>       // Time/date handling
+#include <sys/types.h>  // System data types
+#include <sys/ioctl.h>  // Terminal I/O control
+#include <sys/time.h>   // Time-related system calls
+#include <unistd.h>     // Standard symbolic constants and types
+#include <stdarg.h>     // Variable arguments
+#include <fcntl.h>      // File control
+#include <signal.h>     // Signal handling
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -65,16 +65,17 @@
 #define HL_NUMBER 7
 #define HL_MATCH 8      /* Search match. */
 
+// Define constants for syntax highlighting flags
 #define HL_HIGHLIGHT_STRINGS (1<<0)
 #define HL_HIGHLIGHT_NUMBERS (1<<1)
 
 struct editorSyntax {
-    char **filematch;
-    char **keywords;
-    char singleline_comment_start[2];
-    char multiline_comment_start[3];
-    char multiline_comment_end[3];
-    int flags;
+    char **filematch;                   // Array of file match patterns
+    char **keywords;                    // Array of keywords to highlight
+    char singleline_comment_start[2];   // Single-line comment start character(s)
+    char multiline_comment_start[3];    // Multi-line comment start character(s)
+    char multiline_comment_end[3];      // Multi-line comment end character(s)
+    int flags;                          // Syntax highlighting flags
 };
 
 /* This structure represents a single line of the file we are editing. */
@@ -89,10 +90,12 @@ typedef struct erow {
                            check. */
 } erow;
 
+// Define a struct to represent a highlight color
 typedef struct hlcolor {
     int r,g,b;
 } hlcolor;
 
+// Define a struct to represent the editor configuration
 struct editorConfig {
     int cx,cy;  /* Cursor x and y position in characters */
     int rowoff;     /* Offset of row displayed. */
