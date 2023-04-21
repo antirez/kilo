@@ -109,6 +109,8 @@ struct editorConfig {
     struct editorSyntax *syntax;    /* Current syntax highlight, or NULL. */
 };
 
+//Note: we may want to add a few fields to the erow and editorConfig structs
+
 static struct editorConfig E;
 
 enum KEY_ACTION{
@@ -198,6 +200,7 @@ struct editorSyntax HLDB[] = {
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
 
 /* ======================= Low level terminal handling ====================== */
+//Note: probably don't need to edit these
 
 static struct termios orig_termios; /* In order to restore at exit.*/
 
@@ -214,7 +217,7 @@ void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
 }
 
-/* Raw mode: 1960 magic shit. */
+/* Raw mode: 1960 magic*/
 int enableRawMode(int fd) {
     struct termios raw;
 
@@ -362,6 +365,7 @@ failed:
 }
 
 /* ====================== Syntax highlight color scheme  ==================== */
+//Note: probably don't need to edit these
 
 int is_separator(int c) {
     return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];",c) != NULL;
@@ -551,6 +555,10 @@ void editorSelectSyntaxHighlight(char *filename) {
 }
 
 /* ======================= Editor rows implementation ======================= */
+//Note: probably want to edit these. perhaps at the end of an update function, we call another 
+// function to send an update message to the server.
+//Note: we can copy the logic from these functions to allow for editing after receuving an
+// update message from the server.
 
 /* Update the rendered version and the syntax highlight of a row. */
 void editorUpdateRow(erow *row) {
@@ -616,7 +624,7 @@ void editorFreeRow(erow *row) {
     free(row->hl);
 }
 
-/* Remove the row at the specified position, shifting the remainign on the
+/* Remove the row at the specified position, shifting the remaining on the
  * top. */
 void editorDelRow(int at) {
     erow *row;
@@ -852,6 +860,7 @@ writeerr:
 }
 
 /* ============================= Terminal update ============================ */
+//Note: probably don't need to edit these
 
 /* We define a very simple "append buffer" structure, that is an heap
  * allocated string where we can append to. This is useful in order to
@@ -1008,6 +1017,7 @@ void editorSetStatusMessage(const char *fmt, ...) {
 }
 
 /* =============================== Find mode ================================ */
+//Note: probably don't need to edit these
 
 #define KILO_QUERY_LEN 256
 
@@ -1107,6 +1117,7 @@ void editorFind(int fd) {
 }
 
 /* ========================= Editor events handling  ======================== */
+//Note: we probably don't need to edit these
 
 /* Handle cursor position change because arrow keys were pressed. */
 void editorMoveCursor(int key) {
@@ -1288,7 +1299,10 @@ void initEditor(void) {
     signal(SIGWINCH, handleSigWinCh);
 }
 
+//main program of text-editor client
 int main(int argc, char **argv) {
+
+    //need to change this to be server ip instead
     if (argc != 2) {
         fprintf(stderr,"Usage: kilo <filename>\n");
         exit(1);
