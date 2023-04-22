@@ -53,6 +53,7 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <netdb.h>
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -1299,17 +1300,68 @@ void initEditor(void) {
     signal(SIGWINCH, handleSigWinCh);
 }
 
+void receiveFile(int fd){
+	ssize_t n;
+	FILE *file = fopen("transfer", "w");
+	char buffer[1024];
+	n = read(fd, buffer, 1024);
+	buffer[n] = '\0';
+	while (1){
+		if ((n = read(fd, buffer, 1024)) > 0){
+			// printf("Line: %s\n", buffer);
+			buffer[n] = '\0';
+			if (!strcmp(buffer, "End Transfer")){
+				// printf("Closing\n");
+				fclose(file);
+				return;
+			}
+			fprintf(file, "%s\n", buffer);
+			send(fd, "ACK", 1024, 0);
+		}
+	}
+	//editorOpen("test");
+}
+
 //main program of text-editor client
 int main(int argc, char **argv) {
-
-    //need to change this to be server ip instead
-    if (argc != 2) {
-        fprintf(stderr,"Usage: kilo <filename>\n");
+	//need to change this to be server ip instead
+    if (argc != 3) {
+        fprintf(stderr,"Usage: kilo <host> <port>\n");
         exit(1);
     }
-
-    initEditor();
-    editorSelectSyntaxHighlight(argv[1]);
+	struct addrinfo hints, *res, *traverser;
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	int r = getaddrinfo(argv[1], argv[2], &hints, &res);
+	if (r != 0){
+		fprintf(stderr,"Error: Can't find server.\n");
+		return 1;
+	}
+	// Try addresses until one is successful
+	int serverFd;
+	for (traverser = res; traverser; traverser = traverser->ai_next){
+		if ((serverFd = socket(traverser->ai_family, traverser->ai_socktype, traverser->ai_protocol)) != -1){
+			if ((connect(serverFd, traverser->ai_addr, traverser->ai_addrlen)) == 0){
+				break;
+			}
+		}
+	}
+	printf("Connected\n");
+	char buffer[1024];
+	while (fgets(buffer, 1024, stdin)){
+		buffer[strcspn(buffer, "\r\n")] = 0;
+		if (!strcmp(buffer, "get")){
+			// printf("Get Received\n");
+			send(serverFd, "get", 1024, 0);
+			receiveFile(serverFd);
+		}
+		// printf("%s\n", buffer);
+	}
+	close(serverFd);
+	// exit(0);
+	initEditor();
+    editorSelectSyntaxHighlight("transfer");
     editorOpen(argv[1]);
     enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
