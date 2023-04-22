@@ -1300,6 +1300,8 @@ void initEditor(void) {
     signal(SIGWINCH, handleSigWinCh);
 }
 
+/* ========================= Communication with Server  ======================== */
+
 void receiveFile(int fd){
 	ssize_t n;
 	FILE *file = fopen("transfer", "w");
@@ -1321,6 +1323,8 @@ void receiveFile(int fd){
 	}
 	//editorOpen("test");
 }
+
+/* ============================= Main Program ================================== */
 
 //main program of text-editor client
 int main(int argc, char **argv) {
