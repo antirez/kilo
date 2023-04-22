@@ -1324,11 +1324,13 @@ void receiveFile(int fd){
 
 //main program of text-editor client
 int main(int argc, char **argv) {
-	//need to change this to be server ip instead
+	//check command-line args
     if (argc != 3) {
         fprintf(stderr,"Usage: kilo <host> <port>\n");
         exit(1);
     }
+
+    //setup
 	struct addrinfo hints, *res, *traverser;
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_UNSPEC;
@@ -1338,6 +1340,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr,"Error: Can't find server.\n");
 		return 1;
 	}
+
 	// Try addresses until one is successful
 	int serverFd;
 	for (traverser = res; traverser; traverser = traverser->ai_next){
@@ -1348,6 +1351,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	printf("Connected\n");
+
 	char buffer[1024];
 	while (fgets(buffer, 1024, stdin)){
 		buffer[strcspn(buffer, "\r\n")] = 0;
@@ -1358,8 +1362,11 @@ int main(int argc, char **argv) {
 		}
 		// printf("%s\n", buffer);
 	}
+
 	close(serverFd);
 	// exit(0);
+
+    //start editor
 	initEditor();
     editorSelectSyntaxHighlight("transfer");
     editorOpen(argv[1]);
