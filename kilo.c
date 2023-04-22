@@ -1306,8 +1306,10 @@ void receiveFile(int fd){
 	ssize_t n;
 	FILE *file = fopen("transfer", "w");
 	char buffer[1024];
+
 	n = read(fd, buffer, 1024);
 	buffer[n] = '\0';
+
 	while (1){
 		if ((n = read(fd, buffer, 1024)) > 0){
 			// printf("Line: %s\n", buffer);
@@ -1318,7 +1320,7 @@ void receiveFile(int fd){
 				return;
 			}
 			fprintf(file, "%s\n", buffer);
-			send(fd, "ACK", 1024, 0);
+			send(fd, "ACK", 1024, 0); //why are we sending this?
 		}
 	}
 	//editorOpen("test");
@@ -1360,7 +1362,7 @@ int main(int argc, char **argv) {
 	while (fgets(buffer, 1024, stdin)){
 		buffer[strcspn(buffer, "\r\n")] = 0;
 		if (!strcmp(buffer, "get")){
-			// printf("Get Received\n");
+            printf("sending get\n");
 			send(serverFd, "get", 1024, 0);
 			receiveFile(serverFd);
 		}

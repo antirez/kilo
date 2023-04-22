@@ -33,14 +33,25 @@ vector<string> readFile(){
 //sendFile - send file line-by-line to a client at fd
 void sendFile(int fd, vector<string> lines){
 	vector<string>::iterator i;
+
 	send(fd, (void*)"Start Transfer", 1024, 0);
-	for (i = lines.begin(); i != lines.end(); i++){
+
+/* 	for (i = lines.begin(); i != lines.end(); i++){
 		char buffer[1024];
 		string msg = *i;
 		// cout << "Line: " << msg << endl;
 		send(fd, msg.c_str(), msg.length(), 0);
 		read(fd, buffer, 1024);
+	} */
+
+	//this is the same as the loop that is commented out
+	for(string msg : lines){
+		char buffer[1024];
+
+		send(fd, msg.c_str(), msg.length(), 0);
+		read(fd, buffer, 1024);
 	}
+
 	send(fd, (void*)"End Transfer", 1024, 0);
 }
 
@@ -50,14 +61,16 @@ void *threadFunc(void *args){
 	int clientFd = *(int*)args;
 	char buffer[1024];
 	pthread_detach(pthread_self());
+
 	// Read until disconnection
 	while ((n = read(clientFd, buffer, 1024)) > 0){
 		string line(buffer);
+		
 		if (line == "exit"){
 			close(clientFd);
 		}
-		if (line == "get"){
-			// cout << "Get Received" << endl;
+		else if (line == "get"){
+			cout << "Get Received" << endl;
 			sendFile(clientFd, readFile());	
 		}
 	}
@@ -121,7 +134,7 @@ int main(void){
 	len = sizeof(cliAddr);
 	while (true){
 		int clientFd = accept(serverFd, (struct sockaddr *)&serverAddr, &len);
-		
+
 		// Create thread to deal with client
 		pthread_t thread;
 		pthread_create(&thread, NULL, threadFunc, (void *)&clientFd);
