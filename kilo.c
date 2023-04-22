@@ -1312,10 +1312,9 @@ void receiveFile(int fd){
 
 	while (1){
 		if ((n = read(fd, buffer, 1024)) > 0){
-			// printf("Line: %s\n", buffer);
 			buffer[n] = '\0';
 			if (!strcmp(buffer, "End Transfer")){
-				// printf("Closing\n");
+				printf("Closing\n");
 				fclose(file);
 				return;
 			}
@@ -1323,7 +1322,6 @@ void receiveFile(int fd){
 			send(fd, "ACK", 1024, 0); //why are we sending this?
 		}
 	}
-	//editorOpen("test");
 }
 
 /* ============================= Main Program ================================== */
@@ -1358,6 +1356,7 @@ int main(int argc, char **argv) {
 	}
 	printf("Connected\n");
 
+/*
 	char buffer[1024];
 	while (fgets(buffer, 1024, stdin)){
 		buffer[strcspn(buffer, "\r\n")] = 0;
@@ -1368,14 +1367,25 @@ int main(int argc, char **argv) {
 		}
 		// printf("%s\n", buffer);
 	}
+*/
+
+    char buffer[1024];
+    fgets(buffer, 1024, stdin);
+    buffer[strcspn(buffer, "\r\n")] = 0;
+    if (!strcmp(buffer, "get")){
+        printf("sending get\n");
+        send(serverFd, "get", 1024, 0);
+        receiveFile(serverFd);
+    }
 
 	close(serverFd);
 	// exit(0);
 
+    char filename[20] = "transfer";
     //start editor
 	initEditor();
-    editorSelectSyntaxHighlight("transfer");
-    editorOpen(argv[1]);
+    editorSelectSyntaxHighlight(filename);
+    editorOpen(filename);
     enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
@@ -1383,5 +1393,6 @@ int main(int argc, char **argv) {
         editorRefreshScreen();
         editorProcessKeypress(STDIN_FILENO);
     }
+
     return 0;
 }
