@@ -105,8 +105,14 @@ void handleSigInt(int unused __attribute__((unused))){
 }
 
 //main server program
-int main(void){
-
+int main(int argc, char *argv[]){
+	if (argc != 2){
+		cerr << "Usage: <server> <port>\n";
+		return 1;
+	}
+	stringstream stream(argv[1]);
+	int port;
+	stream >> port;
 	//setup SIGINT signal handler
 	signal(SIGINT, handleSigInt);
 
@@ -128,7 +134,7 @@ int main(void){
 	struct sockaddr_in serverAddr;
 	serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serverAddr.sin_port = htons(10001);
+    serverAddr.sin_port = htons(port);
 	if (bind(serverFd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1){
 		cerr << "Error: Can't bind socket to port." << endl;
 		return 3;
