@@ -20,6 +20,8 @@
 #include <sstream>
 using namespace std;
 
+vector<int> users;
+
 //readFile - reads lines in file into the data structure lines
 vector<string> readFile(){
 	string line;
@@ -99,6 +101,10 @@ void *threadFunc(void *args){
 
             if(validCMD){
                 // Send update messages
+                for(auto user : users){
+                    if(user == clientFd) continue;
+                    write(user, buffer, 1024);
+                }
             }
 		}
 	}
@@ -167,11 +173,11 @@ int main(int argc, char *argv[]){
 	struct sockaddr_in cliAddr;
 	len = sizeof(cliAddr);
 	while (true){
-		int clientFd = accept(serverFd, (struct sockaddr *)&serverAddr, &len);
+		users.push_back(accept(serverFd, (struct sockaddr *)&serverAddr, &len));
 
 		// Create thread to deal with client
 		pthread_t thread;
-		pthread_create(&thread, NULL, threadFunc, (void *)&clientFd);
+		pthread_create(&thread, NULL, threadFunc, (void *)&users[users.size()-1]);
 	}
 	return 0;
 }
