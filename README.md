@@ -6,7 +6,7 @@ Kilo is a small text editor in less than 1K lines of code (counted with cloc).
 A screencast is available here: https://asciinema.org/a/90r2i9bq8po03nazhqtsifksb
 
 Usage: kilo `<filename>`
-New Usage: kilo <host> <port>
+New Usage: kilo `<host>` `<port>`
 
 'get' to copy file from server
 
