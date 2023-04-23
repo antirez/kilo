@@ -55,8 +55,10 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <netdb.h>
+#include <pthread.h>
 
 /* Server Communication */
+#define _POSIX_SOURCE
 #define MSGSIZE 1024
 static int serverFd;
 
@@ -1350,13 +1352,13 @@ void initEditor(void) {
 void receiveFile(){
 	ssize_t n;
 	FILE *file = fopen("transfer", "w");
-	char buffer[1024];
+	char buffer[MSGSIZE];
 
-	n = read(serverFd, buffer, 1024);
+	n = read(serverFd, buffer, MSGSIZE);
 	buffer[n] = '\0';
 
 	while (1){
-		if ((n = read(serverFd, buffer, 1024)) > 0){
+		if ((n = read(serverFd, buffer, MSGSIZE)) > 0){
 			buffer[n] = '\0';
 			if (!strcmp(buffer, "End Transfer")){
 				printf("Closing\n");
@@ -1364,15 +1366,45 @@ void receiveFile(){
 				return;
 			}
 			fprintf(file, "%s\n", buffer);
-			send(serverFd, "ACK", 1024, 0);
+			send(serverFd, "ACK", MSGSIZE, 0);
 		}
 	}
+}
+
+void handle_server_message(char *msg){
+    char cmd[MSGSIZE];
+    int i;
+    
+    //get command
+    for(i = 0; i < MSGSIZE; ++i){
+        if(msg[i] == ':'){break;} //stop reading when we encounter colon
+        cmd[i] = msg[i];
+    }
+}
+
+void *read_server_messages(){
+    char buffer[MSGSIZE];
+    int n;
+
+    pthread_detach(pthread_self());
+
+    if ((n = read(serverFd, buffer, MSGSIZE)) == 0) {
+        printf("server crashed\n");
+        exit(0);
+    }
+    buffer[n] = '\0';
+
+    handle_server_message(buffer);
+
+    return NULL;
 }
 
 /* ============================= Main Program ================================== */
 
 //main program of text-editor client
 int main(int argc, char **argv) {
+    pthread_t read_thread;
+
 	//check command-line args
     if (argc != 3) {
         fprintf(stderr,"Usage: kilo <host> <port>\n");
@@ -1402,6 +1434,12 @@ int main(int argc, char **argv) {
 
     send(serverFd, "get", 1024, 0);
     receiveFile();
+
+    //create thread for reading server messages
+    int i;
+    if ((i = pthread_create(&read_thread, NULL, read_server_messages, (void*)NULL)) != 0) {
+        printf("thread creation failed\n");
+    }
     
     // char buffer[1024] = {'g', 'e', 't', '\0'};
     //start editor
