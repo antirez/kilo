@@ -1371,6 +1371,17 @@ void receiveFile(){
 	}
 }
 
+void handle_server_message(char *msg){
+    char cmd[MSGSIZE];
+    int i;
+    
+    //get command
+    for(i = 0; i < MSGSIZE; ++i){
+        if(msg[i] == ':'){break;} //stop reading when we encounter colon
+        cmd[i] = msg[i];
+    }
+}
+
 void *read_server_messages(){
     char buffer[MSGSIZE];
     int n;
@@ -1382,6 +1393,8 @@ void *read_server_messages(){
         exit(0);
     }
     buffer[n] = '\0';
+
+    handle_server_message(buffer);
 
     return NULL;
 }
