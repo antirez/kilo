@@ -647,7 +647,10 @@ void editorDelRow(int at) {
     E.numrows--;
     E.dirty++;
 
-    //setup server message here
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "dr:%d", at);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Turn the editor rows into a single heap-allocated string.
@@ -699,7 +702,10 @@ void editorRowInsertChar(erow *row, int at, int c) {
     editorUpdateRow(row);
     E.dirty++;
 
-    //setup server message here
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "ic:%d:%d:%c", row->idx, at, c);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Append the string 's' at the end of a row */
@@ -711,7 +717,10 @@ void editorRowAppendString(erow *row, char *s, size_t len) {
     editorUpdateRow(row);
     E.dirty++;
 
-    //setup server message here
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "as:%d:%s", row->idx, s);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Delete the character at offset 'at' from the specified row. */
@@ -722,7 +731,10 @@ void editorRowDelChar(erow *row, int at) {
     row->size--;
     E.dirty++;
 
-    //setup server message here
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "dc:%d:%d", row->idx, at);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Insert the specified char at the current prompt position. */
