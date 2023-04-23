@@ -77,19 +77,19 @@ void *threadFunc(void *args){
 			getline(ss, cmd, ':');
 
 			if(cmd == "ir"){
-				cout << "ir received\n";
+				cout << "ir received\n" << line << endl;
 			}
 			else if(cmd == "dr"){
-				cout << "dr received\n";
+				cout << "dr received\n" << line << endl;
 			}
 			else if(cmd == "ic"){
-				cout << "ic received\n";
+				cout << "ic received\n" << line << endl;
 			}
 			else if(cmd == "as"){
-				cout << "as received\n";
+				cout << "as received\n" << line << endl;
 			}
 			else if(cmd == "dc"){
-				cout << "dc received\n";
+				cout << "dc received\n" << line << endl;
 			}
 			else{
 				cout << "Error: " << cmd << " is not a valid update type\n";

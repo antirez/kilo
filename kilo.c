@@ -49,6 +49,7 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
@@ -1267,6 +1268,11 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+		if (!fork()){
+			char *args[] = {"clear", NULL};
+			execvp("clear", args); // Kills child
+		}
+		wait(NULL); // Wait on child
         close(serverFd);
         exit(0);
         break;
@@ -1404,15 +1410,10 @@ int main(int argc, char **argv) {
 	}
 	printf("Connected\n");
 
-    char buffer[1024];
-    fgets(buffer, 1024, stdin);
-    buffer[strcspn(buffer, "\r\n")] = 0;
-    if (!strcmp(buffer, "get")){
-        printf("sending get\n");
-        send(serverFd, "get", 1024, 0);
-        receiveFile();
-    }
-
+    send(serverFd, "get", 1024, 0);
+    receiveFile();
+    
+    // char buffer[1024] = {'g', 'e', 't', '\0'};
     char filename[20] = "transfer";
     //start editor
 	initEditor();
