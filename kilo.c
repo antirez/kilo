@@ -1269,7 +1269,7 @@ void editorProcessKeypress(int fd) {
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
-        editorSave();
+        //editorSave();
         break;
     case CTRL_F:
         editorFind(fd);
@@ -1410,7 +1410,7 @@ int main(int argc, char **argv) {
     editorOpen(filename);
     enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
-        "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+        "HELP: Ctrl-Q = quit | Ctrl-F = find");
     while(1) {
         editorRefreshScreen();
         editorProcessKeypress(STDIN_FILENO);
