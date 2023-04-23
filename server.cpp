@@ -17,6 +17,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <sstream>
 using namespace std;
 
 //readFile - reads lines in file into the data structure lines
@@ -52,6 +53,8 @@ void *threadFunc(void *args){
 	ssize_t n;
 	int clientFd = *(int*)args;
 	char buffer[1024];
+	bool copied = false;
+
 	pthread_detach(pthread_self());
 
 	// Read until disconnection
@@ -64,6 +67,33 @@ void *threadFunc(void *args){
 		else if (line == "get"){
 			cout << "Get Received" << endl;
 			sendFile(clientFd, readFile());	
+			copied = true;
+		}
+		else if(copied){
+			stringstream ss(line);
+
+			//get update type
+			string cmd;
+			getline(ss, cmd, ':');
+
+			if(cmd == "ir"){
+				cout << "ir received\n";
+			}
+			else if(cmd == "dr"){
+				cout << "dr received\n";
+			}
+			else if(cmd == "ic"){
+				cout << "ic received\n";
+			}
+			else if(cmd == "as"){
+				cout << "as received\n";
+			}
+			else if(cmd == "dc"){
+				cout << "dc received\n";
+			}
+			else{
+				cout << "Error: " << cmd << " is not a valid update type\n";
+			}
 		}
 	}
 	return NULL;
