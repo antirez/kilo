@@ -55,6 +55,10 @@
 #include <signal.h>
 #include <netdb.h>
 
+/* Server Communication */
+#define MSGSIZE 1024
+static int serverFd;
+
 /* Syntax highlight types */
 #define HL_NORMAL 0
 #define HL_NONPRINT 1
@@ -616,6 +620,11 @@ void editorInsertRow(int at, char *s, size_t len) {
     editorUpdateRow(E.row+at);
     E.numrows++;
     E.dirty++;
+
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "ir:%d:%s", at, s);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Free row's heap allocated stuff. */
@@ -637,6 +646,8 @@ void editorDelRow(int at) {
     for (int j = at; j < E.numrows-1; j++) E.row[j].idx++;
     E.numrows--;
     E.dirty++;
+
+    //setup server message here
 }
 
 /* Turn the editor rows into a single heap-allocated string.
@@ -687,6 +698,8 @@ void editorRowInsertChar(erow *row, int at, int c) {
     row->chars[at] = c;
     editorUpdateRow(row);
     E.dirty++;
+
+    //setup server message here
 }
 
 /* Append the string 's' at the end of a row */
@@ -697,6 +710,8 @@ void editorRowAppendString(erow *row, char *s, size_t len) {
     row->chars[row->size] = '\0';
     editorUpdateRow(row);
     E.dirty++;
+
+    //setup server message here
 }
 
 /* Delete the character at offset 'at' from the specified row. */
@@ -706,9 +721,12 @@ void editorRowDelChar(erow *row, int at) {
     editorUpdateRow(row);
     row->size--;
     E.dirty++;
+
+    //setup server message here
 }
 
 /* Insert the specified char at the current prompt position. */
+//don't need to make a server message here since we call editorInsertRow and editorRowInsertChar
 void editorInsertChar(int c) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
@@ -731,6 +749,7 @@ void editorInsertChar(int c) {
 
 /* Inserting a newline is slightly complex as we have to handle inserting a
  * newline in the middle of a line, splitting the line as needed. */
+//don't need to make a server message here since we call editorInsertRow
 void editorInsertNewline(void) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
@@ -767,6 +786,7 @@ fixcursor:
 }
 
 /* Delete the char at the current prompt position. */
+//don't need to make a server message here since we call editorDelRow and editorRowDelChar
 void editorDelChar() {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
@@ -1302,16 +1322,16 @@ void initEditor(void) {
 
 /* ========================= Communication with Server  ======================== */
 
-void receiveFile(int fd){
+void receiveFile(){
 	ssize_t n;
 	FILE *file = fopen("transfer", "w");
 	char buffer[1024];
 
-	n = read(fd, buffer, 1024);
+	n = read(serverFd, buffer, 1024);
 	buffer[n] = '\0';
 
 	while (1){
-		if ((n = read(fd, buffer, 1024)) > 0){
+		if ((n = read(serverFd, buffer, 1024)) > 0){
 			buffer[n] = '\0';
 			if (!strcmp(buffer, "End Transfer")){
 				printf("Closing\n");
@@ -1319,7 +1339,7 @@ void receiveFile(int fd){
 				return;
 			}
 			fprintf(file, "%s\n", buffer);
-			send(fd, "ACK", 1024, 0); //why are we sending this?
+			send(serverFd, "ACK", 1024, 0);
 		}
 	}
 }
@@ -1346,7 +1366,6 @@ int main(int argc, char **argv) {
 	}
 
 	// Try addresses until one is successful
-	int serverFd;
 	for (traverser = res; traverser; traverser = traverser->ai_next){
 		if ((serverFd = socket(traverser->ai_family, traverser->ai_socktype, traverser->ai_protocol)) != -1){
 			if ((connect(serverFd, traverser->ai_addr, traverser->ai_addrlen)) == 0){
@@ -1375,7 +1394,7 @@ int main(int argc, char **argv) {
     if (!strcmp(buffer, "get")){
         printf("sending get\n");
         send(serverFd, "get", 1024, 0);
-        receiveFile(serverFd);
+        receiveFile();
     }
 
 	close(serverFd);
