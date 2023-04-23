@@ -60,6 +60,9 @@
 #define MSGSIZE 1024
 static int serverFd;
 
+/* Temporary File */
+char filename[20] = "transfer";
+
 /* Syntax highlight types */
 #define HL_NORMAL 0
 #define HL_NONPRINT 1
@@ -1262,6 +1265,7 @@ void editorProcessKeypress(int fd) {
 		}
 		wait(NULL); // Wait on child
         close(serverFd);
+		remove(filename);
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
@@ -1400,7 +1404,6 @@ int main(int argc, char **argv) {
     receiveFile();
     
     // char buffer[1024] = {'g', 'e', 't', '\0'};
-    char filename[20] = "transfer";
     //start editor
 	initEditor();
     editorSelectSyntaxHighlight(filename);
