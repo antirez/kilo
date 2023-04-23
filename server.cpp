@@ -36,14 +36,6 @@ void sendFile(int fd, vector<string> lines){
 
 	send(fd, (void*)"Start Transfer", 1024, 0);
 
-/* 	for (i = lines.begin(); i != lines.end(); i++){
-		char buffer[1024];
-		string msg = *i;
-		// cout << "Line: " << msg << endl;
-		send(fd, msg.c_str(), msg.length(), 0);
-		read(fd, buffer, 1024);
-	} */
-
 	//this is the same as the loop that is commented out
 	for(string msg : lines){
 		char buffer[1024];

@@ -1251,6 +1251,7 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        close(serverFd);
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
@@ -1387,19 +1388,6 @@ int main(int argc, char **argv) {
 	}
 	printf("Connected\n");
 
-/*
-	char buffer[1024];
-	while (fgets(buffer, 1024, stdin)){
-		buffer[strcspn(buffer, "\r\n")] = 0;
-		if (!strcmp(buffer, "get")){
-            printf("sending get\n");
-			send(serverFd, "get", 1024, 0);
-			receiveFile(serverFd);
-		}
-		// printf("%s\n", buffer);
-	}
-*/
-
     char buffer[1024];
     fgets(buffer, 1024, stdin);
     buffer[strcspn(buffer, "\r\n")] = 0;
@@ -1408,9 +1396,6 @@ int main(int argc, char **argv) {
         send(serverFd, "get", 1024, 0);
         receiveFile();
     }
-
-	close(serverFd);
-	// exit(0);
 
     char filename[20] = "transfer";
     //start editor
