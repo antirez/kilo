@@ -73,7 +73,8 @@ void *threadFunc(void *args){
 			stringstream ss(line);
 
 			//get update type
-			string cmd;
+            bool validCMD = true;
+            string cmd;
 			getline(ss, cmd, ':');
 
 			if(cmd == "ir"){
@@ -93,7 +94,12 @@ void *threadFunc(void *args){
 			}
 			else{
 				cout << "Error: " << cmd << " is not a valid update type\n";
+                validCMD = false;
 			}
+
+            if(validCMD){
+                // Send update messages
+            }
 		}
 	}
 	return NULL;
