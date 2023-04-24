@@ -49,10 +49,21 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <netdb.h>
+#include <pthread.h>
+
+/* Server Communication */
+#define _POSIX_SOURCE
+#define MSGSIZE 1024
+static int serverFd;
+
+/* Temporary File */
+char filename[20] = "transfer";
 
 /* Syntax highlight types */
 #define HL_NORMAL 0
@@ -108,6 +119,8 @@ struct editorConfig {
     time_t statusmsg_time;
     struct editorSyntax *syntax;    /* Current syntax highlight, or NULL. */
 };
+
+//Note: we may want to add a few fields to the erow and editorConfig structs
 
 static struct editorConfig E;
 
@@ -198,6 +211,7 @@ struct editorSyntax HLDB[] = {
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
 
 /* ======================= Low level terminal handling ====================== */
+//Note: probably don't need to edit these
 
 static struct termios orig_termios; /* In order to restore at exit.*/
 
@@ -214,7 +228,7 @@ void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
 }
 
-/* Raw mode: 1960 magic shit. */
+/* Raw mode: 1960 magic*/
 int enableRawMode(int fd) {
     struct termios raw;
 
@@ -362,6 +376,7 @@ failed:
 }
 
 /* ====================== Syntax highlight color scheme  ==================== */
+//Note: probably don't need to edit these
 
 int is_separator(int c) {
     return c == '\0' || isspace(c) || strchr(",.()+-/*=~%[];",c) != NULL;
@@ -551,6 +566,10 @@ void editorSelectSyntaxHighlight(char *filename) {
 }
 
 /* ======================= Editor rows implementation ======================= */
+//Note: probably want to edit these. perhaps at the end of an update function, we call another 
+// function to send an update message to the server.
+//Note: we can copy the logic from these functions to allow for editing after receuving an
+// update message from the server.
 
 /* Update the rendered version and the syntax highlight of a row. */
 void editorUpdateRow(erow *row) {
@@ -607,6 +626,11 @@ void editorInsertRow(int at, char *s, size_t len) {
     editorUpdateRow(E.row+at);
     E.numrows++;
     E.dirty++;
+
+/*     //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "ir:%d:%s", at, s);
+    send(serverFd, msg, MSGSIZE, 0); */
 }
 
 /* Free row's heap allocated stuff. */
@@ -616,7 +640,7 @@ void editorFreeRow(erow *row) {
     free(row->hl);
 }
 
-/* Remove the row at the specified position, shifting the remainign on the
+/* Remove the row at the specified position, shifting the remaining on the
  * top. */
 void editorDelRow(int at) {
     erow *row;
@@ -628,6 +652,11 @@ void editorDelRow(int at) {
     for (int j = at; j < E.numrows-1; j++) E.row[j].idx++;
     E.numrows--;
     E.dirty++;
+
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "dr:%d", at);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Turn the editor rows into a single heap-allocated string.
@@ -678,6 +707,11 @@ void editorRowInsertChar(erow *row, int at, int c) {
     row->chars[at] = c;
     editorUpdateRow(row);
     E.dirty++;
+
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "ic:%d:%d:%c", row->idx, at, c);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Append the string 's' at the end of a row */
@@ -688,6 +722,11 @@ void editorRowAppendString(erow *row, char *s, size_t len) {
     row->chars[row->size] = '\0';
     editorUpdateRow(row);
     E.dirty++;
+
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "as:%d:%s", row->idx, s);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Delete the character at offset 'at' from the specified row. */
@@ -697,9 +736,15 @@ void editorRowDelChar(erow *row, int at) {
     editorUpdateRow(row);
     row->size--;
     E.dirty++;
+
+    //setup server message
+    char msg[MSGSIZE];
+    sprintf(msg, "dc:%d:%d", row->idx, at);
+    send(serverFd, msg, MSGSIZE, 0);
 }
 
 /* Insert the specified char at the current prompt position. */
+//don't need to make a server message here since we call editorInsertRow and editorRowInsertChar
 void editorInsertChar(int c) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
@@ -722,14 +767,21 @@ void editorInsertChar(int c) {
 
 /* Inserting a newline is slightly complex as we have to handle inserting a
  * newline in the middle of a line, splitting the line as needed. */
+//don't need to make a server message here since we call editorInsertRow
 void editorInsertNewline(void) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    char msg[MSGSIZE];
 
     if (!row) {
         if (filerow == E.numrows) {
             editorInsertRow(filerow,"",0);
+            
+            //server message
+            sprintf(msg, "ir:%d:%s", filerow, "");
+            send(serverFd, msg, MSGSIZE, 0);
+            
             goto fixcursor;
         }
         return;
@@ -739,14 +791,24 @@ void editorInsertNewline(void) {
     if (filecol >= row->size) filecol = row->size;
     if (filecol == 0) {
         editorInsertRow(filerow,"",0);
+
+        //server message
+        sprintf(msg, "ir:%d:%s", filerow, "");
+        send(serverFd, msg, MSGSIZE, 0);
     } else {
         /* We are in the middle of a line. Split it between two rows. */
         editorInsertRow(filerow+1,row->chars+filecol,row->size-filecol);
+
+        //server message
+        sprintf(msg, "ir:%d:%s", filerow+1, row->chars+filecol);
+        send(serverFd, msg, MSGSIZE, 0);
+
         row = &E.row[filerow];
         row->chars[filecol] = '\0';
         row->size = filecol;
         editorUpdateRow(row);
     }
+
 fixcursor:
     if (E.cy == E.screenrows-1) {
         E.rowoff++;
@@ -758,6 +820,7 @@ fixcursor:
 }
 
 /* Delete the char at the current prompt position. */
+//don't need to make a server message here since we call editorDelRow and editorRowDelChar
 void editorDelChar() {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
@@ -852,6 +915,7 @@ writeerr:
 }
 
 /* ============================= Terminal update ============================ */
+//Note: probably don't need to edit these
 
 /* We define a very simple "append buffer" structure, that is an heap
  * allocated string where we can append to. This is useful in order to
@@ -1008,6 +1072,7 @@ void editorSetStatusMessage(const char *fmt, ...) {
 }
 
 /* =============================== Find mode ================================ */
+//Note: probably don't need to edit these
 
 #define KILO_QUERY_LEN 256
 
@@ -1107,6 +1172,7 @@ void editorFind(int fd) {
 }
 
 /* ========================= Editor events handling  ======================== */
+//Note: we probably don't need to edit these
 
 /* Handle cursor position change because arrow keys were pressed. */
 void editorMoveCursor(int key) {
@@ -1184,12 +1250,7 @@ void editorMoveCursor(int key) {
 
 /* Process events arriving from the standard input, which is, the user
  * is typing stuff on the terminal. */
-#define KILO_QUIT_TIMES 3
 void editorProcessKeypress(int fd) {
-    /* When the file is modified, requires Ctrl-q to be pressed N times
-     * before actually quitting. */
-    static int quit_times = KILO_QUIT_TIMES;
-
     int c = editorReadKey(fd);
     switch(c) {
     case ENTER:         /* Enter */
@@ -1200,17 +1261,17 @@ void editorProcessKeypress(int fd) {
          * to the edited file. */
         break;
     case CTRL_Q:        /* Ctrl-q */
-        /* Quit if the file was already saved. */
-        if (E.dirty && quit_times) {
-            editorSetStatusMessage("WARNING!!! File has unsaved changes. "
-                "Press Ctrl-Q %d more times to quit.", quit_times);
-            quit_times--;
-            return;
-        }
+		if (!fork()){
+			char *args[] = {"clear", NULL};
+			execvp("clear", args); // Kills child
+		}
+		wait(NULL); // Wait on child
+        close(serverFd);
+		remove(filename);
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
-        editorSave();
+        //editorSave();
         break;
     case CTRL_F:
         editorFind(fd);
@@ -1250,8 +1311,6 @@ void editorProcessKeypress(int fd) {
         editorInsertChar(c);
         break;
     }
-
-    quit_times = KILO_QUIT_TIMES; /* Reset it to the original value. */
 }
 
 int editorFileWasModified(void) {
@@ -1288,21 +1347,112 @@ void initEditor(void) {
     signal(SIGWINCH, handleSigWinCh);
 }
 
+/* ========================= Communication with Server  ======================== */
+
+void receiveFile(){
+	ssize_t n;
+	FILE *file = fopen("transfer", "w");
+	char buffer[MSGSIZE];
+
+	n = read(serverFd, buffer, MSGSIZE);
+	buffer[n] = '\0';
+
+	while (1){
+		if ((n = read(serverFd, buffer, MSGSIZE)) > 0){
+			buffer[n] = '\0';
+			if (!strcmp(buffer, "End Transfer")){
+				printf("Closing\n");
+				fclose(file);
+				return;
+			}
+			fprintf(file, "%s\n", buffer);
+			send(serverFd, "ACK", MSGSIZE, 0);
+		}
+	}
+}
+
+void handle_server_message(char *msg){
+    char cmd[MSGSIZE];
+    int i;
+    
+    //get command
+    for(i = 0; i < MSGSIZE; ++i){
+        if(msg[i] == ':'){break;} //stop reading when we encounter colon
+        cmd[i] = msg[i];
+    }
+}
+
+void *read_server_messages(){
+    char buffer[MSGSIZE];
+    int n;
+
+    pthread_detach(pthread_self());
+
+    if ((n = read(serverFd, buffer, MSGSIZE)) == 0) {
+        printf("server crashed\n");
+        exit(0);
+    }
+    buffer[n] = '\0';
+
+    handle_server_message(buffer);
+
+    return NULL;
+}
+
+/* ============================= Main Program ================================== */
+
+//main program of text-editor client
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr,"Usage: kilo <filename>\n");
+    pthread_t read_thread;
+
+	//check command-line args
+    if (argc != 3) {
+        fprintf(stderr,"Usage: kilo <host> <port>\n");
         exit(1);
     }
 
-    initEditor();
-    editorSelectSyntaxHighlight(argv[1]);
-    editorOpen(argv[1]);
+    //setup
+	struct addrinfo hints, *res, *traverser;
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	int r = getaddrinfo(argv[1], argv[2], &hints, &res);
+	if (r != 0){
+		fprintf(stderr,"Error: Can't find server.\n");
+		return 1;
+	}
+
+	// Try addresses until one is successful
+	for (traverser = res; traverser; traverser = traverser->ai_next){
+		if ((serverFd = socket(traverser->ai_family, traverser->ai_socktype, traverser->ai_protocol)) != -1){
+			if ((connect(serverFd, traverser->ai_addr, traverser->ai_addrlen)) == 0){
+				break;
+			}
+		}
+	}
+	printf("Connected\n");
+
+    send(serverFd, "get", 1024, 0);
+    receiveFile();
+
+    //create thread for reading server messages
+    int i;
+    if ((i = pthread_create(&read_thread, NULL, read_server_messages, (void*)NULL)) != 0) {
+        printf("thread creation failed\n");
+    }
+    
+    // char buffer[1024] = {'g', 'e', 't', '\0'};
+    //start editor
+	initEditor();
+    editorSelectSyntaxHighlight(filename);
+    editorOpen(filename);
     enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
-        "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+        "HELP: Ctrl-Q = quit | Ctrl-F = find");
     while(1) {
         editorRefreshScreen();
         editorProcessKeypress(STDIN_FILENO);
     }
+
     return 0;
 }
