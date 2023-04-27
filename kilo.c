@@ -165,8 +165,8 @@ void editorSetStatusMessage(const char *fmt, ...);
 char *C_HL_extensions[] = {".c",".h",".cpp",".hpp",".cc",NULL};
 char *C_HL_keywords[] = {
 	/* C Keywords */
-	"auto","break","case","continue","default","do","else","enum",
-	"extern","for","goto","if","register","return","sizeof","static",
+	"auto","break","case","continue","default","#define|","do","else","enum",
+	"extern","for","goto","if","#include","register","return","sizeof","static",
 	"struct","switch","typedef","union","volatile","while","NULL",
 
 	/* C++ Keywords */
