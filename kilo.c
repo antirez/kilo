@@ -212,6 +212,7 @@ void disableRawMode(int fd) {
 /* Called at exit to avoid remaining in raw mode. */
 void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
+    fprintf(stdout, "\033c"); /* '\033' is same as '\x1b' */
 }
 
 /* Raw mode: 1960 magic shit. */
