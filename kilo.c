@@ -997,6 +997,13 @@ void editorRefreshScreen(void) {
     abFree(&ab);
 }
 
+/* This function clear the whole screen using VT100 escape characters */
+void editorClearScreen(void) {
+    struct abuf ab = ABUF_INIT;
+    abAppend(&ab,"\x1b[J", E.numrows);
+    write(STDOUT_FILENO,ab.b,ab.len);
+}
+
 /* Set an editor status message for the second line of the status, at the
  * end of the screen. */
 void editorSetStatusMessage(const char *fmt, ...) {
@@ -1207,6 +1214,7 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        editorClearScreen();
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
