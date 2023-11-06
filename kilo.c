@@ -1002,6 +1002,7 @@ void editorClearScreen(void) {
     struct abuf ab = ABUF_INIT;
     abAppend(&ab,"\x1b[J", E.numrows);
     write(STDOUT_FILENO,ab.b,ab.len);
+    abFree(&ab);
 }
 
 /* Set an editor status message for the second line of the status, at the
