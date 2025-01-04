@@ -1217,7 +1217,10 @@ void editorProcessKeypress(int fd) {
         break;
     case BACKSPACE:     /* Backspace */
     case CTRL_H:        /* Ctrl-h */
+        editorDelChar();
+        break;
     case DEL_KEY:
+        editorMoveCursor(ARROW_RIGHT);
         editorDelChar();
         break;
     case PAGE_UP:
