@@ -412,7 +412,7 @@ void editorUpdateSyntax(erow *row) {
         /* Handle // comments. */
         if (prev_sep && *p == scs[0] && *(p+1) == scs[1]) {
             /* From here to end is a comment */
-            memset(row->hl+i,HL_COMMENT,row->size-i);
+            memset(row->hl+i,HL_COMMENT,row->rsize-i);
             return;
         }
 
@@ -442,7 +442,7 @@ void editorUpdateSyntax(erow *row) {
         /* Handle "" and '' */
         if (in_string) {
             row->hl[i] = HL_STRING;
-            if (*p == '\\') {
+            if (*p == '\\' && *(p+1)) {
                 row->hl[i+1] = HL_STRING;
                 p += 2; i += 2;
                 prev_sep = 0;
@@ -481,12 +481,13 @@ void editorUpdateSyntax(erow *row) {
         /* Handle keywords and lib calls */
         if (prev_sep) {
             int j;
+	    int ileft = row->rsize - i;
             for (j = 0; keywords[j]; j++) {
                 int klen = strlen(keywords[j]);
                 int kw2 = keywords[j][klen-1] == '|';
                 if (kw2) klen--;
 
-                if (!memcmp(p,keywords[j],klen) &&
+                if (klen < ileft && !memcmp(p,keywords[j],klen) &&
                     is_separator(*(p+klen)))
                 {
                     /* Keyword */
