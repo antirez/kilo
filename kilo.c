@@ -165,8 +165,8 @@ void editorSetStatusMessage(const char *fmt, ...);
 char *C_HL_extensions[] = {".c",".h",".cpp",".hpp",".cc",NULL};
 char *C_HL_keywords[] = {
 	/* C Keywords */
-	"auto","break","case","continue","default","do","else","enum",
-	"extern","for","goto","if","register","return","sizeof","static",
+	"auto","break","case","continue","default","#define|","do","else","enum",
+	"extern","for","goto","if","#include","register","return","sizeof","static",
 	"struct","switch","typedef","union","volatile","while","NULL",
 
 	/* C++ Keywords */
@@ -894,7 +894,7 @@ void editorRefreshScreen(void) {
             if (E.numrows == 0 && y == E.screenrows/3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome,sizeof(welcome),
-                    "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
+                    "Kilo editor -- version %s\x1b[0K\r\n", KILO_VERSION);
                 int padding = (E.screencols-welcomelen)/2;
                 if (padding) {
                     abAppend(&ab,"~",1);
