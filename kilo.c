@@ -1047,6 +1047,10 @@ void editorFind(int fd) {
             }
             FIND_RESTORE_HL;
             editorSetStatusMessage("");
+            if (saved_hl) {
+                free(saved_hl);
+                saved_hl=NULL;
+            }
             return;
         } else if (c == ARROW_RIGHT || c == ARROW_DOWN) {
             find_next = 1;
