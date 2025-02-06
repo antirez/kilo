@@ -68,6 +68,8 @@
 #define HL_HIGHLIGHT_STRINGS (1<<0)
 #define HL_HIGHLIGHT_NUMBERS (1<<1)
 
+#define TAB_SIZE 4
+
 struct editorSyntax {
     char **filematch;
     char **keywords;
@@ -168,6 +170,7 @@ char *C_HL_keywords[] = {
 	"auto","break","case","continue","default","do","else","enum",
 	"extern","for","goto","if","register","return","sizeof","static",
 	"struct","switch","typedef","union","volatile","while","NULL",
+	"#include", "#define", 
 
 	/* C++ Keywords */
 	"alignas","alignof","and","and_eq","asm","bitand","bitor","class",
@@ -564,18 +567,18 @@ void editorUpdateRow(erow *row) {
         if (row->chars[j] == TAB) tabs++;
 
     unsigned long long allocsize =
-        (unsigned long long) row->size + tabs*8 + nonprint*9 + 1;
+        (unsigned long long) row->size + tabs*TAB_SIZE + nonprint*9 + 1;
     if (allocsize > UINT32_MAX) {
         printf("Some line of the edited file is too long for kilo\n");
         exit(1);
     }
 
-    row->render = malloc(row->size + tabs*8 + nonprint*9 + 1);
+    row->render = malloc(row->size + tabs*TAB_SIZE + nonprint*9 + 1);
     idx = 0;
     for (j = 0; j < row->size; j++) {
         if (row->chars[j] == TAB) {
             row->render[idx++] = ' ';
-            while((idx+1) % 8 != 0) row->render[idx++] = ' ';
+            while((idx) % TAB_SIZE != 0) row->render[idx++] = ' ';
         } else {
             row->render[idx++] = row->chars[j];
         }
@@ -791,7 +794,25 @@ void editorDelChar(void) {
     if (row) editorUpdateRow(row);
     E.dirty++;
 }
+void editorInvDelChar() {
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    erow *followingRow = (filerow+1 >= E.numrows) ? NULL : &E.row[filerow+1];
 
+    if (!row || (filecol == 0 && filerow == 0)) return;
+    if (filecol == row->size) {
+        /* Handle the case of last column, we need to move the following line
+         * on the right of the current one. */
+        editorRowAppendString(&E.row[filerow],followingRow->chars,followingRow->size);
+        editorDelRow(filerow+1);
+        row = NULL;
+    } else {
+        editorRowDelChar(row,filecol);
+    }
+    if (row) editorUpdateRow(row);
+    E.dirty++;
+}
 /* Load the specified program in the editor memory and returns 0 on success
  * or 1 on error. */
 int editorOpen(char *filename) {
@@ -957,7 +978,7 @@ void editorRefreshScreen(void) {
     int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
         E.filename, E.numrows, E.dirty ? "(modified)" : "");
     int rlen = snprintf(rstatus, sizeof(rstatus),
-        "%d/%d",E.rowoff+E.cy+1,E.numrows);
+        "c: %d/%d l: %d/%d",E.coloff+E.cx,E.row[E.rowoff+E.cy].size,E.rowoff+E.cy+1,E.numrows);
     if (len > E.screencols) len = E.screencols;
     abAppend(&ab,status,len);
     while(len < E.screencols) {
@@ -986,7 +1007,7 @@ void editorRefreshScreen(void) {
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
     if (row) {
         for (j = E.coloff; j < (E.cx+E.coloff); j++) {
-            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
+            if (j < row->size && row->chars[j] == TAB) cx += TAB_SIZE-((cx)%TAB_SIZE);
             cx++;
         }
     }
@@ -1215,10 +1236,18 @@ void editorProcessKeypress(int fd) {
     case CTRL_F:
         editorFind(fd);
         break;
+    case DEL_KEY:
+        editorInvDelChar();
+        break;
     case BACKSPACE:     /* Backspace */
     case CTRL_H:        /* Ctrl-h */
-    case DEL_KEY:
         editorDelChar();
+        break;
+    case END_KEY:
+        E.cx = E.row[E.rowoff+E.cy].size;
+        break;
+    case HOME_KEY:
+        E.cx = 0;
         break;
     case PAGE_UP:
     case PAGE_DOWN:
