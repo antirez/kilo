@@ -552,6 +552,21 @@ void editorSelectSyntaxHighlight(char *filename) {
 
 /* ======================= Editor rows implementation ======================= */
 
+/* how many screen columns does a row prefix need ? */
+int getRenderCol( erow *row, int coloff ) {                                   
+    int cx = 0;                                                              
+    int cxx = 0;
+    if (!row) return coloff; /* safety */
+    for (int j = 0; j < coloff; j++) {                                       
+        if (j < row->size && row->chars[j] == TAB) {                          
+            cx += 8-(cx % 8); /* #define KILO_TAB_WIDTH 8 ! */
+            cxx = 1;
+        } else                                                                
+            cx++;                                                            
+    }                                                                        
+    return cx-cxx;                                                               
+}
+
 /* Update the rendered version and the syntax highlight of a row. */
 void editorUpdateRow(erow *row) {
     unsigned int tabs = 0, nonprint = 0;
@@ -703,17 +718,21 @@ void editorRowDelChar(erow *row, int at) {
 void editorInsertChar(int c) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
+    int rcx = E.cx;
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
-    /* If the row where the cursor is currently located does not exist in our
-     * logical representaion of the file, add enough empty rows as needed. */
-    if (!row) {
+    if (row) {
+	/* Use row to calculate display width for insertion column */
+	rcx = getRenderCol(row, filecol) - getRenderCol(row, E.coloff);
+    } else {
+        /* If the row where the cursor is currently located does not exist in our
+         * logical representaion of the file, add enough empty rows as needed. */
         while(E.numrows <= filerow)
             editorInsertRow(E.numrows,"",0);
     }
     row = &E.row[filerow];
     editorRowInsertChar(row,filecol,c);
-    if (E.cx == E.screencols-1)
+    if (rcx == E.screencols-1)
         E.coloff++;
     else
         E.cx++;
@@ -770,12 +789,13 @@ void editorDelChar(void) {
         filecol = E.row[filerow-1].size;
         editorRowAppendString(&E.row[filerow-1],row->chars,row->size);
         editorDelRow(filerow);
-        row = NULL;
+        row = &E.row[filerow-1];
         if (E.cy == 0)
             E.rowoff--;
         else
             E.cy--;
-        E.cx = filecol;
+	/* Get display width of line join point */
+        E.cx = getRenderCol(row, filecol) - getRenderCol(row, E.coloff);
         if (E.cx >= E.screencols) {
             int shift = (E.screencols-E.cx)+1;
             E.cx -= shift;
@@ -910,12 +930,14 @@ void editorRefreshScreen(void) {
 
         r = &E.row[filerow];
 
-        int len = r->rsize - E.coloff;
+	/* Get display width of hidden LH part of the row */
+        int rcoloff = getRenderCol(r, E.coloff);
+	int len = r->rsize - rcoloff;
         int current_color = -1;
         if (len > 0) {
             if (len > E.screencols) len = E.screencols;
-            char *c = r->render+E.coloff;
-            unsigned char *hl = r->hl+E.coloff;
+            char *c = r->render+rcoloff;
+            unsigned char *hl = r->hl+rcoloff;
             int j;
             for (j = 0; j < len; j++) {
                 if (hl[j] == HL_NONPRINT) {
@@ -980,14 +1002,12 @@ void editorRefreshScreen(void) {
     /* Put cursor at its current position. Note that the horizontal position
      * at which the cursor is displayed may be different compared to 'E.cx'
      * because of TABs. */
-    int j;
     int cx = 1;
     int filerow = E.rowoff+E.cy;
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
     if (row) {
-        for (j = E.coloff; j < (E.cx+E.coloff); j++) {
-            if (j < row->size && row->chars[j] == TAB) cx += 7-((cx)%8);
-            cx++;
+	/* Use display widths to caculate cursor position */
+        cx = getRenderCol(row, cx+E.cx+E.coloff) - getRenderCol(row, E.coloff);
         }
     }
     snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,cx);
