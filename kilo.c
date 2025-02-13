@@ -183,6 +183,65 @@ char *C_HL_keywords[] = {
         "void|","short|","auto|","const|","bool|",NULL
 };
 
+/* Java */
+
+char *JAVA_HL_extensions[] = {".java", NULL};
+char *JAVA_HL_keywords[] = {
+    /* Keywords Java */
+    "abstract","assert","break","case","catch","class","continue","default",
+    "do","else","enum","extends","final","finally","for","if","implements",
+    "import","instanceof","interface","native","new","package","private",
+    "protected","public","return","static","strictfp","super","switch",
+    "synchronized","this","throw","throws","transient","try","volatile",
+    "while","var","yield","sealed","permits","record","module","requires",
+    "exports","opens","uses","provides","with","to",
+
+    /* Data types Java */
+    "int|","long|","double|","float|","char|","byte|","boolean|","short|",
+    "void|","String|","Object|","Integer|","Long|","Double|","Float|",
+    "Character|","Byte|","Boolean|","Short|","Void|",
+
+    /* Constants */
+    "true","false","null",
+    
+    /* Common annotations */
+    "@Override|","@Deprecated|","@SuppressWarnings|","@FunctionalInterface|",
+    "@SafeVarargs|","@Native|",
+    
+    NULL
+};
+
+/* JavaScript */
+
+char *JS_HL_extensions[] = {".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx",NULL};
+char *JS_HL_keywords[] = {
+    
+    /* Keywords */
+    
+    "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+    "default", "delete", "do", "else", "enum", "export", "extends", "finally",
+    "for", "function", "if", "import", "in", "instanceof", "let", "new", "null",
+    "return", "super", "switch", "this", "throw", "try", "typeof", "var", "void",
+    "while", "with", "yield","constructor",
+    
+    /* Data types */
+    
+    "number|", "string|", "boolean|", "object|", "undefined|", "symbol|", "bigint|"
+    
+    /* Constants */
+    
+    "true", "false", "null",
+    
+    /* Annotations */
+    
+    "@param", "@returns", "@log",
+
+    
+    NULL
+};
+
+
+
 /* Here we define an array of syntax highlights by extensions, keywords,
  * comments delimiters and flags. */
 struct editorSyntax HLDB[] = {
@@ -192,7 +251,26 @@ struct editorSyntax HLDB[] = {
         C_HL_keywords,
         "//","/*","*/",
         HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
+    },
+    {
+        
+       /* Java */
+       JAVA_HL_extensions,
+       JAVA_HL_keywords,
+       "//", "/*", "*/",
+       HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
+           
+    },
+    {
+        
+       /* JS */
+       JS_HL_extensions,
+       JS_HL_keywords,
+       "//", "/*", "*/",
+       HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
+           
     }
+    
 };
 
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
