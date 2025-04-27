@@ -1294,10 +1294,10 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    enableRawMode(STDIN_FILENO);
     initEditor();
     editorSelectSyntaxHighlight(argv[1]);
     editorOpen(argv[1]);
-    enableRawMode(STDIN_FILENO);
     editorSetStatusMessage(
         "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
     while(1) {
