@@ -6,5 +6,4 @@ IMPORTANT
 MAYBE
 ===
 
-* Send alternate screen sequences if TERM=xterm: "\033[?1049h" and "\033[?1049l"
 * Improve internals to be more understandable.

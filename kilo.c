@@ -94,6 +94,8 @@ typedef struct hlcolor {
 } hlcolor;
 
 struct editorConfig {
+    int no_altscr;  /* Forbid usage of the alternate-screen. */
+
     int cx,cy;  /* Cursor x and y position in characters */
     int rowoff;     /* Offset of row displayed. */
     int coloff;     /* Offset of column displayed. */
@@ -101,6 +103,7 @@ struct editorConfig {
     int screencols; /* Number of cols that we can show */
     int numrows;    /* Number of rows */
     int rawmode;    /* Is terminal raw mode enabled? */
+    int altscr;     /* Is terminal alternate-screen selected? */
     erow *row;      /* Rows */
     int dirty;      /* File modified but not saved. */
     char *filename; /* Currently open filename */
@@ -212,6 +215,30 @@ void disableRawMode(int fd) {
 /* Called at exit to avoid remaining in raw mode. */
 void editorAtExit(void) {
     disableRawMode(STDIN_FILENO);
+
+    /* Disable alternate screen. */
+    if( E.altscr ) {
+        /* "?47l" ~1978 VT100 DECSET magic. "?1049l" is similar xterm magic */
+		/*  from... some indeterminate time, possibly even before X Windows */
+		/*  existed. */
+            /* To instead enable, use 'h' instead of 'l': note that */
+            /*  initEditor() does the enabling already. */
+        const char altscren[] = "\x1b[?1049l";
+        const int altscren_len = sizeof( altscren );
+        if (write(STDOUT_FILENO, altscren, altscren_len) != altscren_len) {
+            perror("Unable to deselect the alternate screen display buffer");
+            perror("please type" );
+			perror("  echo -e \"\\e[?1049l\"");
+            perror("and then hit your enter key" );
+            exit(1);
+        }
+        E.altscr = 0;
+    } else if( E.no_altscr ) {
+        /* If we aren't using the alternate-screen, move the cursor to the */
+        /*  end of the screen and force a line-advance instead, to prepare */
+        /*  for the return to the CLI. */
+        printf("\x1b[%d;%dH\n\n",E.screenrows+1,E.screencols+1);
+    }
 }
 
 /* Raw mode: 1960 magic shit. */
@@ -1279,19 +1306,52 @@ void initEditor(void) {
     E.cy = 0;
     E.rowoff = 0;
     E.coloff = 0;
+    E.screenrows = 0;
+    E.screencols = 0;
     E.numrows = 0;
+    E.rawmode = 0;
+    E.altscr = 0;
     E.row = NULL;
     E.dirty = 0;
     E.filename = NULL;
     E.syntax = NULL;
+    if( !E.altscr && !E.no_altscr )
+    {
+        char *termstr = getenv( "TERM" );
+        if( termstr && strstr( termstr, "xterm" ) )
+        {
+            /* Activate alternate screen. To disable, use 'l' instead of 'h'. */
+            const char altscren[] = "\x1b[?1049h\n";
+            const int altscren_len = sizeof( altscren );
+            if ( write(STDOUT_FILENO, altscren, altscren_len) != altscren_len) {
+                perror("Unable to select the alternate screen display buffer");
+                exit(1);
+            }
+            E.altscr = 1;
+        }
+    }
     updateWindowSize();
     signal(SIGWINCH, handleSigWinCh);
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr,"Usage: kilo <filename>\n");
+    const char noaltscr_opt[] = "--no-alt-screen";
+    if (argc < 2 || argc > 3) {
+        fprintf(stderr,"Usage: kilo <filename> [%s]\n",noaltscr_opt);
         exit(1);
+    }
+
+    if(argc == 3) {
+        /* Surpress usage of the alternate screen: useful if you */
+        /*  want to keep info displayed on exit. */
+        if( strcmp( noaltscr_opt, argv[2] ) != 0 ) {
+            perror("Unfamiliar option:");
+            fprintf(stderr,"  %s",argv[2]);
+            exit(1);
+        }
+        E.no_altscr = 1;
+    } else {
+        E.no_altscr = 0;
     }
 
     initEditor();

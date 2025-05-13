@@ -1,0 +1,14 @@
+# This is the list of the Kilo text editor's contributors. This file
+# is styled after the "humans.txt" style for websites.
+#
+# This does not necessarily list everyone who has contributed code.
+# To see the full list of contributors, see the revision history in
+# source control. For the list of active maintainers, see
+# MAINTAINERS.txt
+
+	Maintainer: Salvatore Sanfilippo
+	Contact: <antirez at gmail dot com>
+
+	Alt-screen contributor: jam555
+	Contact: <3349478+jam555@users.noreply.github.com>
+	From: USA
