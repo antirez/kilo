@@ -307,14 +307,14 @@ int editorReadKey(int fd) {
 int getCursorPosition(int ifd, int ofd, int *rows, int *cols) {
     char buf[32];
     unsigned int i = 0;
+    buf[0] = '\0';
 
     /* Report cursor location */
     if (write(ofd, "\x1b[6n", 4) != 4) return -1;
 
     /* Read the response: ESC [ rows ; cols R */
-    while (i < sizeof(buf)-1) {
+    while (i < sizeof(buf)-1 && buf[i] != 'R') {
         if (read(ifd,buf+i,1) != 1) break;
-        if (buf[i] == 'R') break;
         i++;
     }
     buf[i] = '\0';
@@ -380,8 +380,11 @@ int editorRowHasOpenComment(erow *row) {
 /* Set every byte of row->hl (that corresponds to every character in the line)
  * to the right syntax highlight type (HL_* defines). */
 void editorUpdateSyntax(erow *row) {
-    row->hl = realloc(row->hl,row->rsize);
-    memset(row->hl,HL_NORMAL,row->rsize);
+    void *temp = realloc(row->hl, row->rsize);
+    if (temp != NULL) {  
+        row->hl = temp;
+        memset(row->hl, HL_NORMAL, row->rsize);
+    }
 
     if (E.syntax == NULL) return; /* No syntax, everything is HL_NORMAL. */
 
@@ -682,8 +685,10 @@ void editorRowInsertChar(erow *row, int at, int c) {
 
 /* Append the string 's' at the end of a row */
 void editorRowAppendString(erow *row, char *s, size_t len) {
-    row->chars = realloc(row->chars,row->size+len+1);
-    memcpy(row->chars+row->size,s,len);
+    char *new_chars = realloc(row->chars, row->size + len + 1);
+    if (new_chars == NULL) return;
+    row->chars = new_chars;
+    memcpy(row->chars + row->size, s, len);
     row->size += len;
     row->chars[row->size] = '\0';
     editorUpdateRow(row);
@@ -801,6 +806,9 @@ int editorOpen(char *filename) {
     free(E.filename);
     size_t fnlen = strlen(filename)+1;
     E.filename = malloc(fnlen);
+    if (E.filename == NULL) {
+        return -1; // Or appropriate error code
+    }
     memcpy(E.filename,filename,fnlen);
 
     fp = fopen(filename,"r");
