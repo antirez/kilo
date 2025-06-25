@@ -168,19 +168,23 @@ char *C_HL_keywords[] = {
 	"auto","break","case","continue","default","do","else","enum",
 	"extern","for","goto","if","register","return","sizeof","static",
 	"struct","switch","typedef","union","volatile","while","NULL",
+	"restrict",
 
 	/* C++ Keywords */
 	"alignas","alignof","and","and_eq","asm","bitand","bitor","class",
-	"compl","constexpr","const_cast","deltype","delete","dynamic_cast",
+	"compl","constexpr","const_cast","decltype","delete","dynamic_cast",
 	"explicit","export","false","friend","inline","mutable","namespace",
 	"new","noexcept","not","not_eq","nullptr","operator","or","or_eq",
 	"private","protected","public","reinterpret_cast","static_assert",
 	"static_cast","template","this","thread_local","throw","true","try",
-	"typeid","typename","virtual","xor","xor_eq",
+	"typeid","typename","virtual","xor","xor_eq","catch","using",
+	"final","override",
 
 	/* C types */
         "int|","long|","double|","float|","char|","unsigned|","signed|",
-        "void|","short|","auto|","const|","bool|",NULL
+        "void|","short|","const|","bool|","size_t|","wchar_t|","int8_t|",
+        "int16_t|","int32_t|","int64_t|","uint8_t|","uint16_t|",
+        "uint32_t|","uint64_t|","intptr_t|","uintptr_t|","FILE|",NULL
 };
 
 /* Here we define an array of syntax highlights by extensions, keywords,
@@ -635,22 +639,33 @@ void editorDelRow(int at) {
  * integer pointed by 'buflen' with the size of the string, escluding
  * the final nulterm. */
 char *editorRowsToString(int *buflen) {
-    char *buf = NULL, *p;
+    char *buf, *p;
     int totlen = 0;
     int j;
 
-    /* Compute count of bytes */
-    for (j = 0; j < E.numrows; j++)
-        totlen += E.row[j].size+1; /* +1 is for "\n" at end of every row */
-    *buflen = totlen;
-    totlen++; /* Also make space for nulterm */
+    /* Handle empty file case */
+    if (E.numrows == 0) {
+        *buflen = 0;
+        buf = malloc(1);
+        buf[0] = '\0';
+        return buf;
+    }
 
-    p = buf = malloc(totlen);
+    /* Compute total length in single pass */
+    for (j = 0; j < E.numrows; j++)
+        totlen += E.row[j].size + 1; /* +1 is for "\n" at end of every row */
+
+    *buflen = totlen;
+    buf = malloc(totlen + 1); /* +1 for null terminator */
+    if (!buf) return NULL;
+
+    p = buf;
     for (j = 0; j < E.numrows; j++) {
-        memcpy(p,E.row[j].chars,E.row[j].size);
-        p += E.row[j].size;
-        *p = '\n';
-        p++;
+        if (E.row[j].size > 0) {
+            memcpy(p, E.row[j].chars, E.row[j].size);
+            p += E.row[j].size;
+        }
+        *p++ = '\n';
     }
     *p = '\0';
     return buf;
@@ -1207,6 +1222,9 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        /* Clear screen before exit */
+        write(STDOUT_FILENO, "\x1b[2J", 4);  /* Clear entire screen */
+        write(STDOUT_FILENO, "\x1b[H", 3);   /* Move cursor to top-left */
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
