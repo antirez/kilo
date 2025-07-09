@@ -1207,6 +1207,9 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+	write(STDOUT_FILENO,"\033[2J",4);
+        write(STDOUT_FILENO,"\033[?1;47l",8);
+        write(STDOUT_FILENO,"\0338",2);
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
@@ -1275,6 +1278,8 @@ void handleSigWinCh(int unused __attribute__((unused))) {
 }
 
 void initEditor(void) {
+	write(STDOUT_FILENO,"\0337",2);
+        write(STDOUT_FILENO,"\033[?1;47h",8);
     E.cx = 0;
     E.cy = 0;
     E.rowoff = 0;
