@@ -204,6 +204,8 @@ static struct termios orig_termios; /* In order to restore at exit.*/
 void disableRawMode(int fd) {
     /* Don't even check the return value as it's too late. */
     if (E.rawmode) {
+        /* Use ansii escape code to exit alternate screen */
+        write(STDOUT_FILENO,"\x1b[?1049l" , 8);
         tcsetattr(fd,TCSAFLUSH,&orig_termios);
         E.rawmode = 0;
     }
@@ -238,9 +240,11 @@ int enableRawMode(int fd) {
     raw.c_cc[VMIN] = 0; /* Return each byte, or zero for timeout. */
     raw.c_cc[VTIME] = 1; /* 100 ms timeout (unit is tens of second). */
 
-    /* put terminal in raw mode after flushing */
-    if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
-    E.rawmode = 1;
+    /* create alternate screeen with ansii escape code and put terminal in raw mode after flushing */
+        write(STDOUT_FILENO, "\x1b[?1049h", 8);
+        if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
+        E.rawmode = 1;
+
     return 0;
 
 fatal:
