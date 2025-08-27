@@ -777,7 +777,7 @@ void editorDelChar(void) {
             E.cy--;
         E.cx = filecol;
         if (E.cx >= E.screencols) {
-            int shift = (E.screencols-E.cx)+1;
+            int shift = (E.cx-E.screencols)+1;
             E.cx -= shift;
             E.coloff += shift;
         }
