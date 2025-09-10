@@ -219,9 +219,9 @@ int enableRawMode(int fd) {
     struct termios raw;
 
     if (E.rawmode) return 0; /* Already enabled. */
-    if (!isatty(STDIN_FILENO)) goto fatal;
+    if (!isatty(STDIN_FILENO)) return -1;
     atexit(editorAtExit);
-    if (tcgetattr(fd,&orig_termios) == -1) goto fatal;
+    if (tcgetattr(fd,&orig_termios) == -1) return -1;
 
     raw = orig_termios;  /* modify the original mode */
     /* input modes: no break, no CR to NL, no parity check, no strip char,
@@ -239,13 +239,9 @@ int enableRawMode(int fd) {
     raw.c_cc[VTIME] = 1; /* 100 ms timeout (unit is tens of second). */
 
     /* put terminal in raw mode after flushing */
-    if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
+    if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) return -1;
     E.rawmode = 1;
     return 0;
-
-fatal:
-    errno = ENOTTY;
-    return -1;
 }
 
 /* Read a key from the terminal put in raw mode, trying to handle
@@ -337,12 +333,12 @@ int getWindowSize(int ifd, int ofd, int *rows, int *cols) {
 
         /* Get the initial position so we can restore it later. */
         retval = getCursorPosition(ifd,ofd,&orig_row,&orig_col);
-        if (retval == -1) goto failed;
+        if (retval == -1) return -1;
 
         /* Go to right/bottom margin and get position. */
-        if (write(ofd,"\x1b[999C\x1b[999B",12) != 12) goto failed;
+        if (write(ofd,"\x1b[999C\x1b[999B",12) != 12) return -1;
         retval = getCursorPosition(ifd,ofd,rows,cols);
-        if (retval == -1) goto failed;
+        if (retval == -1) return -1;
 
         /* Restore position. */
         char seq[32];
@@ -356,9 +352,6 @@ int getWindowSize(int ifd, int ofd, int *rows, int *cols) {
         *rows = ws.ws_row;
         return 0;
     }
-
-failed:
-    return -1;
 }
 
 /* ====================== Syntax highlight color scheme  ==================== */
