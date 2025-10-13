@@ -1,0 +1,7 @@
+Option 1: first read entire file in memory, then compute terminal screen line by line, then write on terminal
+
+    Could there be limitations or performance issues with this approach when implementing the next features from ./TODO?
+
+Option 2: read file byte by byte, keep track of next terminal location, write on the go
+
+    Could there be limitations or performance issues with this approach when implementing the next features from ./TODO?

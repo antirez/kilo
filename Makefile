@@ -1,7 +1,7 @@
-all: kilo
+all: tino
 
-kilo: kilo.c
-	$(CC) -o kilo kilo.c -Wall -W -pedantic -std=c99
+tino: tino.c
+	$(CC) -o tino tino.c -Wall -W -pedantic -std=c99
 
 clean:
-	rm kilo
+	rm tino

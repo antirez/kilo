@@ -1,10 +1,12 @@
 IMPORTANT
 ===
 
-* Testing and stability to reach "usable" level.
+* Vertical splits, 80 cols each, trim lines
+* Wrap characters
 
 MAYBE
 ===
 
-* Send alternate screen sequences if TERM=xterm: "\033[?1049h" and "\033[?1049l"
-* Improve internals to be more understandable.
+* Wrap words
+* Semantic split (based on newlines or "---")
+* Both vertical and horizontal splits on large/vertical displays

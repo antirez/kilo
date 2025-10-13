@@ -1,26 +1,21 @@
-Kilo
+Tino
 ===
 
-Kilo is a small text editor in less than 1K lines of code (counted with cloc).
+Tino is a very simple text visualization utility that lays out the
+given file in enough splits to be visualized from start to finish in
+the current terminal window, if possible. Like laying out every page
+of a screenplay on a wall.
 
-A screencast is available here: https://asciinema.org/a/90r2i9bq8po03nazhqtsifksb
 
-Usage: kilo `<filename>`
+<img src="./tarantino.png" alt="AI-generated Tarantino" width="300px" />
 
-Keys:
+<img src="./tino.png" alt="Tino" width="900px" />
 
-    CTRL-S: Save
-    CTRL-Q: Quit
-    CTRL-F: Find string in file (ESC to exit search, arrows to navigate)
+Usage: tino `<filename>`
 
-Kilo does not depend on any library (not even curses). It uses fairly standard
-VT100 (and similar terminals) escape sequences. The project is in alpha
-stage and was written in just a few hours taking code from my other two
-projects, load81 and linenoise.
+Tino does not depend on any library.
 
-People are encouraged to use it as a starting point to write other editors
-or command line interfaces that are more advanced than the usual REPL
-style CLI.
+Tino was bootstrapped using Salvatore Sanfilippo aka antirez's
+[Kilo](https://github.com/antirez/kilo) as a template.
 
-Kilo was written by Salvatore Sanfilippo aka antirez and is released
-under the BSD 2 clause license.
+Tino was written by Daniel Falbo, and is released under the BSD 2 clause license.
