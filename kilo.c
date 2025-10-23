@@ -1192,6 +1192,8 @@ void editorProcessKeypress(int fd) {
 
     int c = editorReadKey(fd);
     switch(c) {
+    case CTRL_D:
+        break;
     case ENTER:         /* Enter */
         editorInsertNewline();
         break;
