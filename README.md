@@ -24,3 +24,12 @@ style CLI.
 
 Kilo was written by Salvatore Sanfilippo aka antirez and is released
 under the BSD 2 clause license.
+
+# TODO
+
+* Testing and stability to reach "usable" level.
+* Improve internals to be more understandable.
+
+### Maybe
+
+* Send alternate screen sequences if TERM=xterm: "\033[?1049h" and "\033[?1049l"

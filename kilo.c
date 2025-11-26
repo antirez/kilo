@@ -4,7 +4,9 @@
  *
  * -----------------------------------------------------------------------
  *
- * Copyright (C) 2016 Salvatore Sanfilippo <antirez at gmail dot com>
+ * Copyright
+ *  (c) 2016, Salvatore Sanfilippo <antirez at gmail dot com>
+ *  (c) 2025, BloodRose.org <blood rose records at gmail dot com>
  *
  * All rights reserved.
  *
@@ -32,7 +34,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define KILO_VERSION "0.0.1"
+#define KILO_VERSION "0.0.2"
 
 #ifdef __linux__
 #define _POSIX_C_SOURCE 200809L
@@ -89,9 +91,10 @@ typedef struct erow {
                            check. */
 } erow;
 
+/* -- Is not referenced anywhere else
 typedef struct hlcolor {
     int r,g,b;
-} hlcolor;
+} hlcolor; */
 
 struct editorConfig {
     int cx,cy;  /* Cursor x and y position in characters */
@@ -152,50 +155,16 @@ void editorSetStatusMessage(const char *fmt, ...);
  * a trailing '|' character is added at the end, they are highlighted in
  * a different color, so that you can have two different sets of keywords.
  *
- * Finally add a stanza in the HLDB global variable with two two arrays
- * of strings, and a set of flags in order to enable highlighting of
- * comments and numbers.
+ * Finally add the new syntax to the list of syntaxs in the HLBD struct 
+ * found in `./languages/languages.c`, and a set of flags in order 
+ * to enable highlighting of comments and numbers.
  *
  * The characters for single and multi line comments must be exactly two
  * and must be provided as well (see the C language example).
  *
  * There is no support to highlight patterns currently. */
 
-/* C / C++ */
-char *C_HL_extensions[] = {".c",".h",".cpp",".hpp",".cc",NULL};
-char *C_HL_keywords[] = {
-	/* C Keywords */
-	"auto","break","case","continue","default","do","else","enum",
-	"extern","for","goto","if","register","return","sizeof","static",
-	"struct","switch","typedef","union","volatile","while","NULL",
-
-	/* C++ Keywords */
-	"alignas","alignof","and","and_eq","asm","bitand","bitor","class",
-	"compl","constexpr","const_cast","deltype","delete","dynamic_cast",
-	"explicit","export","false","friend","inline","mutable","namespace",
-	"new","noexcept","not","not_eq","nullptr","operator","or","or_eq",
-	"private","protected","public","reinterpret_cast","static_assert",
-	"static_cast","template","this","thread_local","throw","true","try",
-	"typeid","typename","virtual","xor","xor_eq",
-
-	/* C types */
-        "int|","long|","double|","float|","char|","unsigned|","signed|",
-        "void|","short|","auto|","const|","bool|",NULL
-};
-
-/* Here we define an array of syntax highlights by extensions, keywords,
- * comments delimiters and flags. */
-struct editorSyntax HLDB[] = {
-    {
-        /* C / C++ */
-        C_HL_extensions,
-        C_HL_keywords,
-        "//","/*","*/",
-        HL_HIGHLIGHT_STRINGS | HL_HIGHLIGHT_NUMBERS
-    }
-};
-
-#define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))
+#include "languages/languages.c"
 
 /* ======================= Low level terminal handling ====================== */
 
@@ -1207,6 +1176,8 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        // \r \n so that we don't exit into the middle of a line or whatever
+        printf("\r\n");
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
