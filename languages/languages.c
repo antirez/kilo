@@ -5,13 +5,19 @@
 *   goal of being "less than 1000 SLOC"
 */
 
+#include "asm.h"
 #include "c.h"
 #include "cpp.h"
+#include "rust.h"
+#include "python.h"
 
 struct editorSyntax HLDB[] = {
 
+	syntax_asm,
 	syntax_c,
-	syntax_cpp
+	syntax_cpp,
+	syntax_rust,
+	syntax_python
 
 };
 #define HLDB_ENTRIES (sizeof(HLDB)/sizeof(HLDB[0]))

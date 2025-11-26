@@ -4,7 +4,9 @@
  *
  * -----------------------------------------------------------------------
  *
- * Copyright (C) 2016 Salvatore Sanfilippo <antirez at gmail dot com>
+ * Copyright
+ *  (c) 2016, Salvatore Sanfilippo <antirez at gmail dot com>
+ *  (c) 2025, BloodRose.org <blood rose records at gmail dot com>
  *
  * All rights reserved.
  *
@@ -32,7 +34,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define KILO_VERSION "0.0.1"
+#define KILO_VERSION "0.0.2"
 
 #ifdef __linux__
 #define _POSIX_C_SOURCE 200809L
@@ -89,9 +91,10 @@ typedef struct erow {
                            check. */
 } erow;
 
+/* -- Is not referenced anywhere else
 typedef struct hlcolor {
     int r,g,b;
-} hlcolor;
+} hlcolor; */
 
 struct editorConfig {
     int cx,cy;  /* Cursor x and y position in characters */
@@ -1173,6 +1176,8 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        // \r \n so that we don't exit into the middle of a line or whatever
+        printf("\r\n");
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
