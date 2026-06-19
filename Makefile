@@ -1,7 +1,12 @@
-all: kilo
+# Adapt CC/CFLAGS to match the rest of user/bin in the OS1/NEXS tree
+# (cross-compiler, -ffreestanding flags, link script, etc).
+CC ?= cc
+CFLAGS ?= -Wall -Wextra -std=c99 -I../../include/api
 
-kilo: kilo.c
-	$(CC) -o kilo kilo.c -Wall -W -pedantic -std=c99
+all: kilo.elf
+
+kilo.elf: kilo.c
+	$(CC) $(CFLAGS) -o kilo.elf kilo.c
 
 clean:
-	rm kilo
+	rm -f kilo.elf
