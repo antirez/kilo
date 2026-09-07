@@ -48,7 +48,6 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/time.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
@@ -71,7 +70,7 @@
 struct editorSyntax {
     char **filematch;
     char **keywords;
-    char singleline_comment_start[2];
+    char singleline_comment_start[3];
     char multiline_comment_start[3];
     char multiline_comment_end[3];
     int flags;
@@ -104,6 +103,7 @@ struct editorConfig {
     erow *row;      /* Rows */
     int dirty;      /* File modified but not saved. */
     char *filename; /* Currently open filename */
+    int iscrlf;     /* Does file end with CRLF? */
     char statusmsg[80];
     time_t statusmsg_time;
     struct editorSyntax *syntax;    /* Current syntax highlight, or NULL. */
@@ -146,13 +146,13 @@ void editorSetStatusMessage(const char *fmt, ...);
  * matches and keywords. The file name matches are used in order to match
  * a given syntax with a given file name: if a match pattern starts with a
  * dot, it is matched as the last past of the filename, for example ".c".
- * Otherwise the pattern is just searched inside the filenme, like "Makefile").
+ * Otherwise, the pattern is just searched inside the filename, like "Makefile").
  *
- * The list of keywords to highlight is just a list of words, however if they
+ * The list of keywords to highlight is just a list of words, however if
  * a trailing '|' character is added at the end, they are highlighted in
  * a different color, so that you can have two different sets of keywords.
  *
- * Finally add a stanza in the HLDB global variable with two two arrays
+ * Finally add a stanza in the HLDB global variable with two arrays
  * of strings, and a set of flags in order to enable highlighting of
  * comments and numbers.
  *
@@ -227,11 +227,11 @@ int enableRawMode(int fd) {
     /* input modes: no break, no CR to NL, no parity check, no strip char,
      * no start/stop output control. */
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    /* output modes - disable post processing */
+    /* output modes - disable post-processing */
     raw.c_oflag &= ~(OPOST);
     /* control modes - set 8 bit chars */
     raw.c_cflag |= (CS8);
-    /* local modes - choing off, canonical off, no extended functions,
+    /* local modes - echoing off, canonical off, no extended functions,
      * no signal chars (^Z,^C) */
     raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
     /* control chars - set return condition: min number of bytes and timer. */
@@ -259,7 +259,7 @@ int editorReadKey(int fd) {
     while(1) {
         switch(c) {
         case ESC:    /* escape sequence */
-            /* If this is just an ESC, we'll timeout here. */
+            /* If this is just an ESC, we'll time out here. */
             if (read(fd,seq,1) == 0) return ESC;
             if (read(fd,seq+1,1) == 0) return ESC;
 
@@ -461,7 +461,7 @@ void editorUpdateSyntax(erow *row) {
             }
         }
 
-        /* Handle non printable chars. */
+        /* Handle non-printable chars. */
         if (!isprint(*p)) {
             row->hl[i] = HL_NONPRINT;
             p++; i++;
@@ -507,7 +507,7 @@ void editorUpdateSyntax(erow *row) {
         p++; i++;
     }
 
-    /* Propagate syntax change to the next row if the open commen
+    /* Propagate syntax change to the next row if the open comment
      * state changed. This may recursively affect all the following rows
      * in the file. */
     int oc = editorRowHasOpenComment(row);
@@ -525,7 +525,7 @@ int editorSyntaxToColor(int hl) {
     case HL_KEYWORD2: return 32;    /* green */
     case HL_STRING: return 35;      /* magenta */
     case HL_NUMBER: return 31;      /* red */
-    case HL_MATCH: return 34;      /* blu */
+    case HL_MATCH: return 34;      /* blue */
     default: return 37;             /* white */
     }
 }
@@ -558,7 +558,7 @@ void editorUpdateRow(erow *row) {
     int j, idx;
 
    /* Create a version of the row we can directly print on the screen,
-     * respecting tabs, substituting non printable characters with '?'. */
+     * respecting tabs, substituting non-printable characters with '?'. */
     free(row->render);
     for (j = 0; j < row->size; j++)
         if (row->chars[j] == TAB) tabs++;
@@ -616,7 +616,7 @@ void editorFreeRow(erow *row) {
     free(row->hl);
 }
 
-/* Remove the row at the specified position, shifting the remainign on the
+/* Remove the row at the specified position, shifting the remaining on the
  * top. */
 void editorDelRow(int at) {
     erow *row;
@@ -632,7 +632,7 @@ void editorDelRow(int at) {
 
 /* Turn the editor rows into a single heap-allocated string.
  * Returns the pointer to the heap-allocated string and populate the
- * integer pointed by 'buflen' with the size of the string, escluding
+ * integer pointed by 'buflen' with the size of the string, excluding
  * the final nulterm. */
 char *editorRowsToString(int *buflen) {
     char *buf = NULL, *p;
@@ -640,8 +640,10 @@ char *editorRowsToString(int *buflen) {
     int j;
 
     /* Compute count of bytes */
-    for (j = 0; j < E.numrows; j++)
+    for (j = 0; j < E.numrows; j++) {
         totlen += E.row[j].size+1; /* +1 is for "\n" at end of every row */
+        if (E.iscrlf) totlen++; /* for "\r" */
+    }
     *buflen = totlen;
     totlen++; /* Also make space for nulterm */
 
@@ -649,6 +651,7 @@ char *editorRowsToString(int *buflen) {
     for (j = 0; j < E.numrows; j++) {
         memcpy(p,E.row[j].chars,E.row[j].size);
         p += E.row[j].size;
+        if (E.iscrlf) *p++ = '\r';
         *p = '\n';
         p++;
     }
@@ -706,7 +709,7 @@ void editorInsertChar(int c) {
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
 
     /* If the row where the cursor is currently located does not exist in our
-     * logical representaion of the file, add enough empty rows as needed. */
+     * logical representation of the file, add enough empty rows as needed. */
     if (!row) {
         while(E.numrows <= filerow)
             editorInsertRow(E.numrows,"",0);
@@ -816,8 +819,13 @@ int editorOpen(char *filename) {
     size_t linecap = 0;
     ssize_t linelen;
     while((linelen = getline(&line,&linecap,fp)) != -1) {
-        if (linelen && (line[linelen-1] == '\n' || line[linelen-1] == '\r'))
+        if (linelen && (line[linelen-1] == '\n' || line[linelen-1] == '\r')) {
+            if (linelen >= 2 && line[linelen-1] == '\n' && line[linelen-2] == '\r') {
+                E.iscrlf = 1;
+                linelen--;
+            }
             line[--linelen] = '\0';
+        }
         editorInsertRow(E.numrows,line,linelen);
     }
     free(line);
@@ -853,7 +861,7 @@ writeerr:
 
 /* ============================= Terminal update ============================ */
 
-/* We define a very simple "append buffer" structure, that is an heap
+/* We define a very simple "append buffer" structure, that is a heap
  * allocated string where we can append to. This is useful in order to
  * write all the escape sequences in a buffer and flush them to the standard
  * output in a single call, to avoid flickering effects. */
@@ -877,6 +885,15 @@ void abFree(struct abuf *ab) {
     free(ab->b);
 }
 
+/* This function erase all of the visible screen contents before exiting. */
+void editorClearScreen(void) {
+    struct abuf ab = ABUF_INIT;
+    abAppend(&ab, "\x1b[2J", 4);
+    abAppend(&ab, "\x1b[H", 3);
+    write(STDOUT_FILENO, ab.b, ab.len);
+    abFree(&ab);
+}
+
 /* This function writes the whole screen using VT100 escape characters
  * starting from the logical state of the editor in the global state 'E'. */
 void editorRefreshScreen(void) {
@@ -894,7 +911,7 @@ void editorRefreshScreen(void) {
             if (E.numrows == 0 && y == E.screenrows/3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome,sizeof(welcome),
-                    "Kilo editor -- verison %s\x1b[0K\r\n", KILO_VERSION);
+                    "Kilo editor -- version %s\x1b[0K\r\n", KILO_VERSION);
                 int padding = (E.screencols-welcomelen)/2;
                 if (padding) {
                     abAppend(&ab,"~",1);
@@ -1207,6 +1224,7 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        editorClearScreen();
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
@@ -1241,7 +1259,7 @@ void editorProcessKeypress(int fd) {
         editorMoveCursor(c);
         break;
     case CTRL_L: /* ctrl+l, clear screen */
-        /* Just refresht the line as side effect. */
+        /* Just refresh the line as side effect. */
         break;
     case ESC:
         /* Nothing to do for ESC in this mode. */
@@ -1283,6 +1301,7 @@ void initEditor(void) {
     E.row = NULL;
     E.dirty = 0;
     E.filename = NULL;
+    E.iscrlf =  0;
     E.syntax = NULL;
     updateWindowSize();
     signal(SIGWINCH, handleSigWinCh);
