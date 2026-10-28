@@ -1207,6 +1207,7 @@ void editorProcessKeypress(int fd) {
             quit_times--;
             return;
         }
+        write(STDOUT_FILENO, "\x1b[2J", 4);
         exit(0);
         break;
     case CTRL_S:        /* Ctrl-s */
