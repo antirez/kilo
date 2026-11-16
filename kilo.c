@@ -699,11 +699,47 @@ void editorRowDelChar(erow *row, int at) {
     E.dirty++;
 }
 
+static int editorIsCodeAt(erow *row, int cx);
+
+/* Remove one indentation level before inserting a closing brace. */
+static void editorAutoOutdent(void) {
+    int filerow = E.rowoff+E.cy;
+    int filecol = E.coloff+E.cx;
+    erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    int i, spaces = 0, remove = 0;
+
+    if (E.syntax == NULL || !row || filecol == 0 || filecol > row->size ||
+        !editorIsCodeAt(row,filecol))
+        return;
+
+    /* Only outdent when the cursor is still in the leading whitespace. */
+    for (i = 0; i < filecol; i++)
+        if (row->chars[i] != ' ' && row->chars[i] != '\t')
+            return;
+
+    if (row->chars[filecol-1] == '\t') {
+        remove = 1;
+    } else {
+        for (i = filecol-1; i >= 0 && row->chars[i] == ' '; i--)
+            spaces++;
+        remove = spaces > 4 ? 4 : spaces;
+    }
+
+    while (remove--) {
+        editorRowDelChar(row,filecol-1);
+        filecol--;
+        if (E.cx > 0) E.cx--;
+        else if (E.coloff > 0) E.coloff--;
+    }
+}
+
 /* Insert the specified char at the current prompt position. */
 void editorInsertChar(int c) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+
+    if (c == '}') editorAutoOutdent();
 
     /* If the row where the cursor is currently located does not exist in our
      * logical representaion of the file, add enough empty rows as needed. */
@@ -712,6 +748,7 @@ void editorInsertChar(int c) {
             editorInsertRow(E.numrows,"",0);
     }
     row = &E.row[filerow];
+    filecol = E.coloff+E.cx;
     editorRowInsertChar(row,filecol,c);
     if (E.cx == E.screencols-1)
         E.coloff++;
@@ -720,33 +757,141 @@ void editorInsertChar(int c) {
     E.dirty++;
 }
 
-/* Inserting a newline is slightly complex as we have to handle inserting a
- * newline in the middle of a line, splitting the line as needed. */
+/* Return true if a position is outside a string or comment. */
+static int editorIsCodeAt(erow *row, int cx) {
+    int i = 0, in_string = 0, in_comment;
+
+    if (!row || cx < 0 || cx > row->size) return 0;
+    in_comment = row->idx > 0 && E.row[row->idx-1].hl_oc;
+
+    /* Scan the line prefix so comment markers work even without whitespace. */
+    while (i < cx) {
+        char c = row->chars[i];
+
+        if (in_comment) {
+            if (c == '*' && i+1 < cx && row->chars[i+1] == '/') {
+                in_comment = 0;
+                i += 2;
+            } else {
+                i++;
+            }
+            continue;
+        }
+
+        if (in_string) {
+            if (c == '\\' && i+1 < cx) {
+                i += 2;
+            } else {
+                if (c == in_string) in_string = 0;
+                i++;
+            }
+            continue;
+        }
+
+        if (c == '/' && i+1 < cx) {
+            if (row->chars[i+1] == '/') return 0;
+            if (row->chars[i+1] == '*') {
+                in_comment = 1;
+                i += 2;
+                continue;
+            }
+        }
+
+        if (c == '"' || c == '\'') in_string = c;
+        i++;
+    }
+
+    return !in_string && !in_comment;
+}
+
+/* Return true if a brace is not part of a string or comment. */
+static int editorIsRealBraceAt(erow *row, int cx) {
+    if (!row || cx < 0 || cx >= row->size ||
+        (row->chars[cx] != '{' && row->chars[cx] != '}'))
+        return 0;
+    return editorIsCodeAt(row,cx);
+}
+
+/* Inserting a newline splits the current row and preserves C/C++ indentation. */
 void editorInsertNewline(void) {
     int filerow = E.rowoff+E.cy;
     int filecol = E.coloff+E.cx;
     erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+    char *indent = NULL;
+    int indent_len = 0, closing_indent_len = 0;
+    int opens = 0, closes = 0;
+
+    if (row && E.syntax != NULL) {
+        int j, k;
+        if (filecol > row->size) filecol = row->size;
+
+        /* Copy the leading whitespace from the current line. */
+        while (indent_len < row->size &&
+               (row->chars[indent_len] == ' ' ||
+                row->chars[indent_len] == '\t'))
+            indent_len++;
+        indent = malloc(indent_len+1);
+        if (indent) {
+            memcpy(indent,row->chars,indent_len);
+            indent[indent_len] = '\0';
+            closing_indent_len = indent_len;
+
+            /* Check the nearest non-whitespace character before the cursor. */
+            j = filecol-1;
+            while (j >= 0 &&
+                   (row->chars[j] == ' ' || row->chars[j] == '\t'))
+                j--;
+            if (j >= 0 && row->chars[j] == '{' &&
+                editorIsRealBraceAt(row,j))
+                opens = 1;
+
+            /* Check the first non-whitespace character after the cursor. */
+            k = filecol;
+            while (k < row->size &&
+                   (row->chars[k] == ' ' || row->chars[k] == '\t'))
+                k++;
+            if (k < row->size && row->chars[k] == '}' &&
+                editorIsRealBraceAt(row,k))
+                closes = 1;
+
+            /* A tab is one indentation level; spaces use a four-column level. */
+            if (closing_indent_len > 0) {
+                if (indent[closing_indent_len-1] == '\t') {
+                    closing_indent_len--;
+                } else {
+                    int spaces = 0;
+                    while (spaces < closing_indent_len &&
+                           indent[closing_indent_len-spaces-1] == ' ')
+                        spaces++;
+                    if (spaces > 4) spaces = 4;
+                    closing_indent_len -= spaces;
+                }
+            }
+        }
+    }
 
     if (!row) {
         if (filerow == E.numrows) {
             editorInsertRow(filerow,"",0);
             goto fixcursor;
         }
+        free(indent);
         return;
     }
-    /* If the cursor is over the current line size, we want to conceptually
-     * think it's just over the last character. */
+
+    /* If the cursor is over the current line size, treat it as end-of-line. */
     if (filecol >= row->size) filecol = row->size;
     if (filecol == 0) {
         editorInsertRow(filerow,"",0);
     } else {
-        /* We are in the middle of a line. Split it between two rows. */
+        /* Split the current line at the cursor. */
         editorInsertRow(filerow+1,row->chars+filecol,row->size-filecol);
         row = &E.row[filerow];
         row->chars[filecol] = '\0';
         row->size = filecol;
         editorUpdateRow(row);
     }
+
 fixcursor:
     if (E.cy == E.screenrows-1) {
         E.rowoff++;
@@ -755,6 +900,40 @@ fixcursor:
     }
     E.cx = 0;
     E.coloff = 0;
+
+    if (indent) {
+        int i;
+
+        if (opens && closes) {
+            /* Put the closing brace on its own line at the original indent. */
+            erow *closing_row;
+            int closing_row_index = filerow+2;
+            editorInsertRow(filerow+1,"",0);
+            closing_row = &E.row[closing_row_index];
+
+            /* Remove whitespace between the cursor and the closing brace. */
+            while (closing_row->size > 0 &&
+                   (closing_row->chars[0] == ' ' ||
+                    closing_row->chars[0] == '\t'))
+                editorRowDelChar(closing_row,0);
+
+            for (i = indent_len-1; i >= 0; i--)
+                editorRowInsertChar(closing_row,0,indent[i]);
+
+            for (i = 0; i < indent_len; i++)
+                editorInsertChar(indent[i]);
+            editorInsertChar(TAB);
+        } else if (opens) {
+            for (i = 0; i < indent_len; i++)
+                editorInsertChar(indent[i]);
+            editorInsertChar(TAB);
+        } else {
+            int copy_len = closes ? closing_indent_len : indent_len;
+            for (i = 0; i < copy_len; i++)
+                editorInsertChar(indent[i]);
+        }
+        free(indent);
+    }
 }
 
 /* Delete the char at the current prompt position. */
